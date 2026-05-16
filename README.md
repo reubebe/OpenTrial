@@ -1,5 +1,11 @@
 # OpenTrial
 
+[![GitHub Pages: live](https://img.shields.io/badge/GitHub_Pages-live-brightgreen?logo=github)](https://ds4cabs.github.io/OpenTrial/)
+![CABS: 2026](https://img.shields.io/badge/CABS-2026-6f42c1)
+![status: MVP in progress](https://img.shields.io/badge/status-MVP_in_progress-f1c40f)
+![type: Computation Engine](https://img.shields.io/badge/type-Computation_Engine-1f6feb)
+![domain: Bayesian Trial Design](https://img.shields.io/badge/domain-Bayesian_Trial_Design-0aa)
+
 **Intern:** Reuben N Addison
 **Project Type:** Computation Engine
 
