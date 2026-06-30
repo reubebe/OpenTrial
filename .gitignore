@@ -9,3 +9,4 @@ __pycache__/
 docs/_handbook_assets/
 docs/_rendered*/
 docs/*.docx
+docs/handbook/build/

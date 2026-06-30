@@ -5,6 +5,7 @@ description = "Bayesian clinical trial design engine with cited evidence provena
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+  "pydantic>=2.7",
   "streamlit>=1.36",
 ]
 

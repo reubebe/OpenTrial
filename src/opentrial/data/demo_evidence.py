@@ -8,6 +8,7 @@ def t2d_hba1c_evidence() -> list[EvidenceRecord]:
 
     return [
         EvidenceRecord(
+            evidence_kind="effect_estimate",
             source="ClinicalTrials.gov",
             title="SGLT2 inhibitor add-on therapy in adults with type 2 diabetes",
             effect=0.48,
@@ -20,6 +21,7 @@ def t2d_hba1c_evidence() -> list[EvidenceRecord]:
             notes="Synthetic normalized precedent record for offline MVP demo.",
         ),
         EvidenceRecord(
+            evidence_kind="effect_estimate",
             source="ClinicalTrials.gov",
             title="GLP-1 receptor agonist versus placebo for glycemic control",
             effect=0.62,
@@ -32,6 +34,7 @@ def t2d_hba1c_evidence() -> list[EvidenceRecord]:
             notes="Synthetic normalized precedent record for offline MVP demo.",
         ),
         EvidenceRecord(
+            evidence_kind="effect_estimate",
             source="PubMed",
             title="Meta-analysis of incretin-based therapy on HbA1c reduction",
             effect=0.55,
@@ -44,6 +47,7 @@ def t2d_hba1c_evidence() -> list[EvidenceRecord]:
             notes="Synthetic literature effect estimate for offline MVP demo.",
         ),
         EvidenceRecord(
+            evidence_kind="effect_estimate",
             source="PubMed",
             title="Systematic review of SGLT2 inhibitor glycemic efficacy",
             effect=0.43,
