@@ -1,3 +1,10 @@
+> **Status note (original brief / roadmap).** This document is the *initial scoping brief*,
+> kept for context. It does not all describe what is currently built. The implemented system
+> uses standard-library math by default (with an **optional** PyMC Bayesian meta-analysis
+> engine), Streamlit, Pydantic, and direct REST calls; WHO ICTRP is tracked but access-required
+> and not yet wired; PDF export and group-sequential adaptive simulation remain future work.
+> For the current state, see `README.md` and `docs/OpenTrial_Project_Handbook.pdf`.
+
 # OpenTrial — MVP Version (Gemini AI Agent · Computation Engine)
 
 **Intern:** Reuben N Addison

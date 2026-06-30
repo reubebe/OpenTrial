@@ -25,4 +25,31 @@ def test_demo_vertical_slice_produces_report():
     assert prior.records_used == len(evidence)
     assert recommendation is not None
     assert "# OpenTrial Design Report" in report
+    assert "Endpoint SD: 1.00" in report
     assert "Evidence Provenance" in report
+
+
+def test_markdown_report_can_include_ai_narrative():
+    design = TrialDesignInput(
+        indication="Type 2 Diabetes",
+        endpoint="HbA1c change from baseline",
+        target_effect=0.50,
+        alpha=0.025,
+        desired_power=0.80,
+        max_n_per_arm=300,
+    )
+
+    evidence = t2d_hba1c_evidence()
+    prior = build_prior(evidence)
+    grid = simulate_design_grid(design, prior)
+    recommendation = recommend_sample_size(grid, design.desired_power)
+    report = render_markdown_report(
+        design,
+        evidence,
+        prior,
+        grid,
+        recommendation,
+        narrative="## AI Narrative Synthesis\n\nShort narrative.",
+    )
+
+    assert "AI Narrative Synthesis" in report

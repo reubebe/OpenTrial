@@ -4,6 +4,7 @@ from opentrial.schemas import (
     DesignPoint,
     EvidenceRecord,
     PriorSummary,
+    SourceOutcome,
     TrialDesignInput,
 )
 
@@ -14,6 +15,8 @@ def render_markdown_report(
     prior: PriorSummary,
     grid: list[DesignPoint],
     recommendation: DesignPoint | None,
+    narrative: str = "",
+    source_outcomes: list[SourceOutcome] | None = None,
 ) -> str:
     rec_text = (
         f"{recommendation.n_per_arm} participants per arm "
@@ -21,14 +24,14 @@ def render_markdown_report(
         if recommendation
         else f"Not reached by {design.max_n_per_arm} participants per arm"
     )
-
     lines = [
         "# OpenTrial Design Report",
         "",
         "## Design Question",
         f"- Indication: {design.indication}",
         f"- Endpoint: {design.endpoint}",
-        f"- Target effect: {design.target_effect:.2f}",
+        f"- Target effect (mean difference): {design.target_effect:.2f}",
+        f"- Endpoint SD: {design.endpoint_sd:.2f}",
         f"- One-sided alpha: {design.alpha:.3f}",
         f"- Desired power: {design.desired_power:.2f}",
         "",
@@ -39,17 +42,41 @@ def render_markdown_report(
         f"- Records used: {prior.records_used}",
         f"- Evidence effective N: {prior.effective_n}",
         "",
-        "## Recommendation",
-        f"- Recommended sample size: {rec_text}",
-        "",
-        "## Operating Characteristics",
-        "| N per arm | Power | Posterior Pr(effect > 0) |",
-        "| ---: | ---: | ---: |",
     ]
+
+    if narrative:
+        lines.extend([narrative, ""])
+
+    if source_outcomes:
+        lines.extend(
+            [
+                "## Evidence Source Status",
+                "| Source | Status | Records | Message |",
+                "| --- | --- | ---: | --- |",
+            ]
+        )
+        for outcome in source_outcomes:
+            message = outcome.message.replace("|", " ") if outcome.message else ""
+            lines.append(
+                f"| {outcome.name} | {outcome.status} | {outcome.n_records} | {message} |"
+            )
+        lines.append("")
+
+    lines.extend(
+        [
+            "## Recommendation",
+            f"- Recommended sample size: {rec_text}",
+            "",
+            "## Operating Characteristics",
+            "| N per arm | Power | Beta | Alpha / Type I error | Bayesian assurance | Posterior Pr(effect > 0) |",
+            "| ---: | ---: | ---: | ---: | ---: | ---: |",
+        ]
+    )
 
     for point in grid:
         lines.append(
-            f"| {point.n_per_arm} | {point.power:.3f} | "
+            f"| {point.n_per_arm} | {point.power:.3f} | {point.beta:.3f} | "
+            f"{point.type_i_error:.3f} | {point.assurance:.3f} | "
             f"{point.posterior_success_probability:.3f} |"
         )
 
@@ -57,15 +84,15 @@ def render_markdown_report(
         [
             "",
             "## Evidence Provenance",
-            "| Source | Year | Title | Effect | SE | N |",
-            "| --- | ---: | --- | ---: | ---: | ---: |",
+            "| Kind | Source | Year | Title | Effect | SE | N |",
+            "| --- | --- | ---: | --- | ---: | ---: | ---: |",
         ]
     )
 
     for record in evidence:
         title = record.title.replace("|", " ")
         lines.append(
-            f"| {record.source} | {record.year} | [{title}]({record.url}) | "
+            f"| {record.evidence_kind} | {record.source} | {record.year} | [{title}]({record.url}) | "
             f"{record.effect:.3f} | {record.standard_error:.3f} | {record.n} |"
         )
 
@@ -73,9 +100,13 @@ def render_markdown_report(
         [
             "",
             "## Notes",
-            "- This first slice uses deterministic seeded evidence so the app runs without secrets.",
-            "- Live ClinicalTrials.gov and PubMed adapters should replace the seeded evidence next.",
-            "- The current power model is a transparent normal approximation for a continuous endpoint.",
+            "- Records with SE=0 are retained for provenance but excluded from prior estimation.",
+            "- Registry, citation, safety, and label records provide context unless effect uncertainty is extractable.",
+            "- PubMed abstracts can enter prior estimation only when a conservative effect-size extractor finds an effect with 95% CI.",
+            "- Beta is the type-II error rate at the target effect: beta = 1 - power.",
+            "- Alpha / type-I error is shown as the pre-specified one-sided error-control reference.",
+            "- Bayesian assurance is the probability of target-effect success averaged over the evidence-derived prior.",
+            "- The current power model is a transparent normal-approximation engine for a continuous endpoint.",
         ]
     )
     return "\n".join(lines)
