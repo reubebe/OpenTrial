@@ -61,7 +61,8 @@ PoC path works on day one. To pull live evidence, copy `.env.example` to `.env`,
    download the report as Markdown or JSON.
 
 ## Operating characteristics & provenance (the part to scrutinize)
-This is the heart of the PoC and the thing reviewers should look at first:
+This is the heart of the PoC and the thing reviewers should look at first. Every formula
+below is written out, with its assumptions and known limitations, in **[docs/METHODS.md](docs/METHODS.md)**.
 
 - **Power / beta / assurance.** The report's operating-characteristics table walks sample size
   upward and shows, at each N: power at the target effect, beta (Type II error), an alpha /
