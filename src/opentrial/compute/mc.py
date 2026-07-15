@@ -20,7 +20,7 @@ from __future__ import annotations
 import random
 from statistics import NormalDist
 
-from opentrial.compute.simulation import effect_standard_error, posterior_success_probability
+from opentrial.compute.simulation import effect_standard_error
 from opentrial.schemas import DesignPoint, PriorSummary, TrialDesignInput
 
 
@@ -75,9 +75,6 @@ def simulate_operating_characteristics(
                 power=power,
                 beta=1 - power,
                 type_i_error=type_i_hits / n_sims,
-                posterior_success_probability=posterior_success_probability(
-                    n_per_arm, design, prior
-                ),
                 assurance=assurance_hits / n_sims,
             )
         )

@@ -120,6 +120,32 @@ def test_the_demo_prior_is_stable_and_documented():
 
     prior = build_prior(list(t2d_hba1c_evidence()))
     assert prior.records_used == 4
-    assert prior.effective_n == 2564
+    assert prior.pooled_participants == 2564
     assert prior.mean == pytest.approx(0.5009, abs=5e-4)
     assert prior.sd == pytest.approx(0.0544, abs=5e-4)
+
+
+def test_pooled_participants_is_not_the_priors_information_content():
+    """The rename guards a real confusion: 2564 people, but the weight of ~675 per arm.
+
+    "Effective N" reads as effective sample size, a Bayesian term of art meaning how many
+    patients the prior is *worth*. This prior is pooled from 2564 participants but carries far
+    less weight than that, so the two numbers must not share a name.
+    """
+
+    from opentrial.compute.simulation import prior_equivalent_n_per_arm
+    from opentrial.schemas import TrialDesignInput
+
+    prior = build_prior(list(t2d_hba1c_evidence()))
+    design = TrialDesignInput(
+        indication="Type 2 Diabetes",
+        endpoint="HbA1c",
+        target_effect=0.5,
+        alpha=0.025,
+        desired_power=0.8,
+        max_n_per_arm=300,
+    )
+
+    equivalent = prior_equivalent_n_per_arm(prior, design)
+    assert equivalent == pytest.approx(675, abs=1)
+    assert equivalent < prior.pooled_participants

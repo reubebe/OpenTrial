@@ -35,6 +35,20 @@ def effect_standard_error(design: TrialDesignInput, n_per_arm: int) -> float:
     return _difference_se(n_per_arm, design.endpoint_sd)
 
 
+def prior_equivalent_n_per_arm(prior: PriorSummary, design: TrialDesignInput) -> float:
+    """How many patients per arm the prior is *worth*, on this design's scale.
+
+    This is the prior's information content, which is what ``pooled_participants`` is often
+    mistaken for and is usually far smaller. A two-arm trial with ``n`` per arm estimates the
+    effect with variance ``2*sigma^2/n``; setting that equal to the prior's variance and
+    solving for ``n`` gives the trial that would carry the same weight.
+    """
+
+    if prior.sd <= 0:
+        return math.inf
+    return 2 * design.endpoint_sd**2 / prior.sd**2
+
+
 # --- the four core formulas, expressed once in terms of an effect-scale SE ----------
 
 
@@ -52,7 +66,21 @@ def _assurance_from_se(prior: PriorSummary, standard_error: float, alpha: float)
     return 1 - _normal_cdf((success_threshold - prior.mean) / marginal_sd)
 
 
-def _posterior_from_se(target_effect: float, prior: PriorSummary, standard_error: float) -> float:
+def _posterior_from_se(
+    target_effect: float,
+    prior: PriorSummary,
+    standard_error: float,
+    threshold: float = 0.0,
+) -> float:
+    """Pr(effect > ``threshold``) after observing exactly ``target_effect``.
+
+    A conjugate normal update. Note this answers a *hypothetical* ("if the trial read exactly
+    the target, what would we then believe?"), because at design time no data exists. With
+    ``threshold = 0`` and a prior centred well above zero it saturates near 1.0 at every
+    sample size and cannot discriminate; a threshold at the minimum clinically important
+    difference is what makes it informative.
+    """
+
     likelihood_variance = standard_error**2
     prior_variance = prior.sd**2
     posterior_variance = 1 / ((1 / prior_variance) + (1 / likelihood_variance))
@@ -60,7 +88,7 @@ def _posterior_from_se(target_effect: float, prior: PriorSummary, standard_error
         (prior.mean / prior_variance) + (target_effect / likelihood_variance)
     )
     posterior_sd = math.sqrt(posterior_variance)
-    return 1 - _normal_cdf((0 - posterior_mean) / posterior_sd)
+    return 1 - _normal_cdf((threshold - posterior_mean) / posterior_sd)
 
 
 # --- public continuous helpers (used by tests and the continuous path) --------------
@@ -100,10 +128,13 @@ def prior_predictive_assurance(
 def posterior_success_probability(
     n_per_arm: int, design: TrialDesignInput, prior: PriorSummary
 ) -> float:
-    """Approximate posterior probability that the treatment effect is positive."""
+    """Approximate posterior Pr(effect > design.success_threshold)."""
 
     return _posterior_from_se(
-        design.target_effect, prior, effect_standard_error(design, n_per_arm)
+        design.target_effect,
+        prior,
+        effect_standard_error(design, n_per_arm),
+        design.success_threshold,
     )
 
 
@@ -123,9 +154,6 @@ def simulate_design_grid(
                 power=power,
                 beta=1 - power,
                 type_i_error=design.alpha,
-                posterior_success_probability=_posterior_from_se(
-                    design.target_effect, prior, standard_error
-                ),
                 assurance=_assurance_from_se(prior, standard_error, design.alpha),
             )
         )

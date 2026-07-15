@@ -24,6 +24,12 @@ class TrialDesignInput(FrozenModel):
     # of 1.0 means target_effect is already a standardized effect size. For an
     # absolute endpoint (e.g. HbA1c %), set the real SD (HbA1c is typically ~1.0-1.2).
     endpoint_sd: float = Field(default=1.0, gt=0)
+    # Effect the posterior must exceed for "success", in the same units as ``target_effect``.
+    # The default of 0 asks Pr(effect > 0), i.e. "is it better than control at all?" -- a
+    # question that saturates near 1.0 whenever the prior and target both sit well above
+    # zero, and so cannot discriminate between sample sizes. Set it to the minimum clinically
+    # important difference to ask the question that actually decides a trial.
+    success_threshold: float = Field(default=0.0, ge=0)
 
 
 class EvidenceRecord(FrozenModel):
@@ -61,7 +67,11 @@ class EvidenceRecord(FrozenModel):
 class PriorSummary(FrozenModel):
     mean: float
     sd: float = Field(ge=0)
-    effective_n: int = Field(ge=0)
+    # Provenance, NOT the prior's information content: the number of participants behind the
+    # contributing records. Deliberately not called "effective N", which in Bayesian usage
+    # means effective sample size (how many patients the prior is *worth*). For that, see
+    # ``opentrial.compute.simulation.prior_equivalent_n_per_arm``.
+    pooled_participants: int = Field(ge=0)
     records_used: int = Field(ge=0)
     method: str
 
@@ -71,7 +81,6 @@ class DesignPoint(FrozenModel):
     power: float = Field(ge=0, le=1)
     beta: float = Field(default=1.0, ge=0, le=1)
     type_i_error: float = Field(default=0.0, ge=0, le=1)
-    posterior_success_probability: float = Field(ge=0, le=1)
     assurance: float = Field(default=0.0, ge=0, le=1)
 
 

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from opentrial.compute.simulation import (
+    posterior_success_probability,
+    prior_equivalent_n_per_arm,
+)
 from opentrial.schemas import (
     DesignPoint,
     EvidenceRecord,
@@ -7,6 +11,31 @@ from opentrial.schemas import (
     SourceOutcome,
     TrialDesignInput,
 )
+
+
+def _coherence_check(
+    design: TrialDesignInput,
+    prior: PriorSummary,
+    recommendation: DesignPoint | None,
+) -> list[str]:
+    """One line reporting the posterior, as a design coherence check.
+
+    Pr(effect > threshold) after observing exactly the target is deliberately *not* a column
+    in the grid: it conditions on the target being observed, so it barely moves with sample
+    size and cannot help choose one. It is still worth stating once. A value near 1 confirms
+    the prior and the target agree and that the target clears the threshold comfortably; a low
+    value means the prior is fighting the design, which is a problem worth seeing.
+    """
+
+    if recommendation is None:
+        return []
+    probability = posterior_success_probability(recommendation.n_per_arm, design, prior)
+    return [
+        f"- Coherence check: if the trial read exactly the target effect, "
+        f"Pr(effect > {design.success_threshold:g}) = {probability:.3f}. "
+        "This conditions on the target being observed, so it does not vary usefully with N; "
+        "assurance is the quantity that discriminates between sample sizes."
+    ]
 
 
 def render_markdown_report(
@@ -40,7 +69,9 @@ def render_markdown_report(
         f"- Prior mean: {prior.mean:.3f}",
         f"- Prior SD: {prior.sd:.3f}",
         f"- Records used: {prior.records_used}",
-        f"- Evidence effective N: {prior.effective_n}",
+        f"- Participants behind the prior: {prior.pooled_participants} (provenance, not weight)",
+        f"- Prior is worth about {prior_equivalent_n_per_arm(prior, design):.0f} patients "
+        "per arm (its actual information content)",
         "",
     ]
 
@@ -66,18 +97,18 @@ def render_markdown_report(
         [
             "## Recommendation",
             f"- Recommended sample size: {rec_text}",
+            *_coherence_check(design, prior, recommendation),
             "",
             "## Operating Characteristics",
-            "| N per arm | Power | Beta | Alpha / Type I error | Bayesian assurance | Posterior Pr(effect > 0) |",
-            "| ---: | ---: | ---: | ---: | ---: | ---: |",
+            "| N per arm | Power | Beta | Alpha / Type I error | Bayesian assurance |",
+            "| ---: | ---: | ---: | ---: | ---: |",
         ]
     )
 
     for point in grid:
         lines.append(
             f"| {point.n_per_arm} | {point.power:.3f} | {point.beta:.3f} | "
-            f"{point.type_i_error:.3f} | {point.assurance:.3f} | "
-            f"{point.posterior_success_probability:.3f} |"
+            f"{point.type_i_error:.3f} | {point.assurance:.3f} |"
         )
 
     lines.extend(

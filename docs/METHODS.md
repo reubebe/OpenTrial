@@ -85,11 +85,26 @@ Laird 1986.)
   four studies it has wide sampling variability and truncates to zero readily, as it does
   here. REML or a weakly-informative prior on `τ` would be better behaved for small evidence
   bases. DL is the right default and a documented standard; it is not the last word.
-- **`effective_n` is descriptive, not statistical.** It sums the participants behind the
-  records. It is provenance, not the prior's information content. A prior of SD 0.0544
-  carries about as much information as a trial with 676 patients per arm, not 2564.
 - Records are assumed independent. Two publications reporting the same trial would be
   double-counted.
+
+### `pooled_participants` is provenance, not weight
+
+The prior reports `pooled_participants = 2564`, the number of people behind the contributing
+records. That is **provenance, not the prior's information content**, and the two are far
+apart: a prior of SD 0.0544 carries about as much weight as a trial with **675 patients per
+arm**.
+
+This field used to be called `effective_n`, which was actively misleading, because "effective
+sample size" is a Bayesian term of art meaning exactly the thing it was *not* measuring. It is
+now named for what it is, and `simulation.prior_equivalent_n_per_arm(prior, design)` computes
+the real information content:
+
+```
+n_equivalent = 2σ² / σ₀²          (the trial whose SE would match the prior's spread)
+```
+
+Both numbers appear in the report, each labelled for what it is.
 
 ---
 
@@ -137,21 +152,32 @@ assurance = 1 − Φ( ( z_{1−α}·SE(n) − μ₀ ) / sqrt( σ₀² + SE(n)² 
 Assurance is nearly always **below** power at the same `n` (0.873 vs 0.885 at `n = 80` on the
 demo), because the prior admits effects smaller than the target. That gap is the honest part.
 
-### Posterior Pr(effect > 0): the conjugate Bayesian update
+### Posterior Pr(effect > threshold): the conjugate Bayesian update
 
 Normal prior times normal likelihood, in precision (`1/variance`) form:
 
 ```
 posterior variance  σ_post² = 1 / ( 1/σ₀² + 1/SE² )
 posterior mean      μ_post  = σ_post² · ( μ₀/σ₀² + δ/SE² )
-Pr(effect > 0)              = 1 − Φ( −μ_post / σ_post )
+Pr(effect > t)              = 1 − Φ( (t − μ_post) / σ_post )
 ```
 
-> **Read this one carefully.** It answers a *hypothetical*: "if the trial observed exactly the
-> target effect δ, what would we then believe?" It is not a prediction from data, because no
-> data exists at design time. Since the demo's prior and δ both sit near 0.5, far above zero,
-> this value pins at **1.0000** and stays there across the grid. It is close to uninformative
-> here, and it should not be read as "the trial is certain to succeed."
+The threshold `t` is `design.success_threshold`, defaulting to 0. Setting it to the minimum
+clinically important difference asks the question that actually decides a trial, rather than
+the much weaker "is it better than control at all?"
+
+> **This is not a grid column, and that is deliberate.** It answers a *hypothetical*: "if the
+> trial observed exactly the target effect δ, what would we then believe?" Conditioning on the
+> target being observed makes the answer nearly independent of sample size, so it cannot help
+> choose one. Measured across `n = 20…140` on the demo, the value moves by **0.0000 at `t = 0`
+> and by only 0.019 even at `t = 0.48`**, essentially the target itself. Assurance moves by
+> 0.62 over the same range.
+>
+> It was previously reported per-N, where it printed `1.0000` on every row: a column of noise.
+> It is now stated once, as a **coherence check**. A value near 1 confirms the prior and the
+> target agree and that the target clears the threshold; a low value means the prior is
+> fighting the design, which is worth seeing. **Assurance is the quantity that discriminates
+> between sample sizes**, and it already sits in the grid.
 
 ### Type I error
 
@@ -163,9 +189,10 @@ measures it.
 
 ## 4. The sample-size grid and the recommendation
 
-`simulate_design_grid` walks `n` from 20 to `max_n_per_arm` in **steps of 20**, evaluating all
-four quantities at each point. `recommend_sample_size` returns the **first** `n` whose power
-reaches the desired power.
+`simulate_design_grid` walks `n` from 20 to `max_n_per_arm` in **steps of 20**, evaluating
+power, beta, the alpha reference and assurance at each point. (The posterior is not among
+them, for the reason given in section 3.) `recommend_sample_size` returns the **first** `n`
+whose power reaches the desired power.
 
 Consequence: the recommendation is granular to 20, so it **overshoots**. The demo recommends
 `n = 80` with power **0.885**, not 0.800; the true 80% crossing is at `n = 63`. This is a
@@ -197,8 +224,8 @@ than take the formula on trust.
 It is also the seam where realism gets added later. Non-normal endpoints, dropout, or
 group-sequential looks have no closed form, and this is where they would go.
 
-Posterior Pr(effect > 0) stays analytic even here: it is a conjugate Bayesian update, not a
-frequentist rejection rate, so simulating it would be a category error.
+The posterior coherence check stays analytic even here: it is a conjugate Bayesian update, not
+a frequentist rejection rate, so simulating it would be a category error.
 
 ---
 
@@ -230,7 +257,7 @@ from opentrial.data.demo_evidence import t2d_hba1c_evidence
 from opentrial.schemas import TrialDesignInput
 
 prior = build_prior(list(t2d_hba1c_evidence()))
-print(f'prior: mean={prior.mean:.4f} sd={prior.sd:.4f} n={prior.effective_n}')
+print(f'prior: mean={prior.mean:.4f} sd={prior.sd:.4f} n={prior.pooled_participants}')
 
 design = TrialDesignInput(indication='Type 2 Diabetes', endpoint='HbA1c',
                           target_effect=0.5, alpha=0.025, desired_power=0.8,

@@ -61,7 +61,7 @@ def build_prior(evidence: list[EvidenceRecord]) -> PriorSummary:
         return PriorSummary(
             mean=0.0,
             sd=1.0,
-            effective_n=0,
+            pooled_participants=0,
             records_used=0,
             method="weakly-informative fallback prior",
         )
@@ -91,7 +91,7 @@ def build_prior(evidence: list[EvidenceRecord]) -> PriorSummary:
     return PriorSummary(
         mean=mean,
         sd=sd,
-        effective_n=sum(record.n for record in usable),
+        pooled_participants=sum(record.n for record in usable),
         records_used=len(usable),
         method=method,
     )
