@@ -17,24 +17,51 @@ below come from the seeded T2D / HbA1c demo (`src/opentrial/data/demo_evidence.p
 
 ## 1. The evidence-derived prior
 
-`compute/priors.py` pools the cited records into one normal prior by **inverse-variance
-weighting**, the standard fixed-effect meta-analysis estimator.
+`compute/priors.py` pools the cited records into one normal prior by **DerSimonian-Laird
+random-effects meta-analysis**.
 
-Each usable record contributes weight `wᵢ = 1 / SEᵢ²`, so precise studies count more:
-
-```
-prior mean  μ₀ = Σ wᵢ·effectᵢ / Σ wᵢ
-fixed-effect SE      = sqrt( 1 / Σ wᵢ )
-```
-
-That fixed-effect SE assumes every study estimates the *same* underlying effect. Real trials
-differ, so the prior SD is inflated by a **heterogeneity** term (the sample SD of the observed
-effects) and floored at 0.05:
+Start with inverse-variance weighting, where each record contributes `wᵢ = 1 / SEᵢ²`, so
+precise studies count more:
 
 ```
-τ̂ = sample SD of the observed effects        (0 when only one record)
-prior SD  σ₀ = max( sqrt( fixed_SE² + τ̂² ), 0.05 )
+fixed-effect mean  μ_F = Σ wᵢ·effectᵢ / Σ wᵢ
+fixed-effect SE        = sqrt( 1 / Σ wᵢ )
 ```
+
+That assumes every study estimates the *same* underlying effect. Real trials differ, so the
+prior must widen by however much they genuinely disagree. The subtlety is that observed
+effects scatter for **two** reasons: real between-study heterogeneity, and each study's own
+sampling error. Only the first should widen the prior, because the inverse-variance term
+already carries the second.
+
+**Cochran's Q** separates them. It measures the observed scatter, and its expectation under
+"no heterogeneity" is its degrees of freedom `k - 1`. Only the excess over that expectation
+is real:
+
+```
+Q  = Σ wᵢ·(effectᵢ − μ_F)²
+C  = Σ wᵢ − ( Σ wᵢ² / Σ wᵢ )
+τ² = max( 0, (Q − (k − 1)) / C )        ← truncated: a negative variance is meaningless
+```
+
+Random-effects weights then add `τ²` to each study's own variance, so heterogeneity both
+widens the prior and flattens the weighting between studies:
+
+```
+wᵢ* = 1 / (SEᵢ² + τ²)
+prior mean  μ₀ = Σ wᵢ*·effectᵢ / Σ wᵢ*
+prior SD    σ₀ = max( sqrt( 1 / Σ wᵢ* ), 0.05 )
+```
+
+When `Q ≤ k − 1`, `τ²` truncates to zero and the estimator collapses to the fixed-effect
+answer. That is the documented behaviour of the estimator, not a special case.
+
+> **This replaced an earlier, wrong formula.** The prior SD used to be
+> `sqrt(fixed_SE² + τ̂²)` where `τ̂` was the plain sample SD of the observed effects. That
+> quantity contains within-study sampling error *as well as* heterogeneity, so it
+> double-counted the sampling error the fixed-effect term had already accounted for. On this
+> demo it inflated the prior SD from 0.0544 to 0.1016, a factor of **1.87**, purely from
+> noise. `tests/test_priors.py` pins the correct value so the old formula cannot creep back.
 
 **The honesty rule.** Only records with `standard_error > 0` reach the prior. Registry rows,
 FAERS safety counts, and label text carry no effect estimate, so they are listed in the
@@ -42,21 +69,25 @@ provenance table for traceability but **contribute nothing to the numbers**. Wit
 record at all, the prior falls back to `Normal(0, 1)`: weakly informative and centered on *no
 effect*, which is the conservative direction.
 
-On the demo's four records this gives **μ₀ = 0.5009, σ₀ = 0.1016** from `n = 2564` pooled
-participants.
+On the demo's four records this gives **μ₀ = 0.5009, σ₀ = 0.0544** from `n = 2564` pooled
+participants. Cochran's Q is **1.52 on 3 df**, comfortably below its expectation, so `τ² = 0`:
+the spread from 0.43 to 0.62 is entirely explainable by sampling error, and there is no
+detectable heterogeneity to widen the prior with.
+
+Verified against `statsmodels.stats.meta_analysis.combine_effects(method_re="dl")`, which
+agrees to 9 decimal places once truncation is matched. (statsmodels reports the raw moment
+estimate, which here is negative; this implementation truncates at zero per DerSimonian &
+Laird 1986.)
 
 ### Limitations worth a reviewer's attention
 
-- **τ̂ is not a proper heterogeneity estimator.** The sample SD of observed effects contains
-  both real between-study heterogeneity *and* each study's own sampling error, so it
-  double-counts the latter and **over-inflates the prior SD**. A DerSimonian-Laird or REML
-  estimate of `τ²` subtracts out the within-study part. The error is in the conservative
-  direction (a wider prior claims less), but it is an approximation, not the textbook
-  random-effects prior. On the demo it is the dominant term: `fixed_SE = 0.054` vs
-  `τ̂ = 0.086`.
+- **`τ²` is unstable at small `k`.** DerSimonian-Laird is a moment estimator, and with only
+  four studies it has wide sampling variability and truncates to zero readily, as it does
+  here. REML or a weakly-informative prior on `τ` would be better behaved for small evidence
+  bases. DL is the right default and a documented standard; it is not the last word.
 - **`effective_n` is descriptive, not statistical.** It sums the participants behind the
-  records. It is provenance, not the prior's information content. The prior is not literally
-  worth 2564 patients.
+  records. It is provenance, not the prior's information content. A prior of SD 0.0544
+  carries about as much information as a trial with 676 patients per arm, not 2564.
 - Records are assumed independent. Two publications reporting the same trial would be
   double-counted.
 
@@ -103,7 +134,7 @@ SD adds in quadrature:
 assurance = 1 − Φ( ( z_{1−α}·SE(n) − μ₀ ) / sqrt( σ₀² + SE(n)² ) )
 ```
 
-Assurance is nearly always **below** power at the same `n` (0.845 vs 0.885 at `n = 80` on the
+Assurance is nearly always **below** power at the same `n` (0.873 vs 0.885 at `n = 80` on the
 demo), because the prior admits effects smaller than the target. That gap is the honest part.
 
 ### Posterior Pr(effect > 0): the conjugate Bayesian update
@@ -212,8 +243,8 @@ print(f'recommended N={point.n_per_arm} power={point.power:.4f} assurance={point
 Expected output:
 
 ```
-prior: mean=0.5009 sd=0.1016 n=2564
-recommended N=80 power=0.8854 assurance=0.8453
+prior: mean=0.5009 sd=0.0544 n=2564
+recommended N=80 power=0.8854 assurance=0.8733
 ```
 
 The default path is deterministic, so these are exact. The Monte Carlo path is seeded
