@@ -24,6 +24,7 @@ from opentrial.integrations.clinicaltrials import get_trials_ct_gov
 from opentrial.integrations.dailymed import get_dailymed_full_label
 from opentrial.integrations.gemini import generate_report_narrative
 from opentrial.integrations.openfda import get_safety_signals
+from opentrial.integrations.opentargets import get_disease_target_context
 from opentrial.integrations.pubmed import get_pubmed_effects
 from opentrial.report.markdown import render_markdown_report
 from opentrial.schemas import (
@@ -41,6 +42,7 @@ SRC_CTGOV = "ClinicalTrials.gov"
 SRC_PUBMED = "PubMed"
 SRC_OPENFDA = "openFDA (safety)"
 SRC_DAILYMED = "DailyMed (labels)"
+SRC_OPENTARGETS = "Open Targets (biology)"
 
 EVIDENCE_SOURCES = [
     SRC_DEMO,
@@ -48,6 +50,7 @@ EVIDENCE_SOURCES = [
     SRC_PUBMED,
     SRC_OPENFDA,
     SRC_DAILYMED,
+    SRC_OPENTARGETS,
 ]
 
 
@@ -110,6 +113,7 @@ def _live_fetchers(
         SRC_PUBMED: lambda: get_pubmed_effects(design.indication, design.endpoint, n=10),
         SRC_OPENFDA: lambda: get_safety_signals(drug_or_class, n=10),
         SRC_DAILYMED: lambda: get_dailymed_full_label(drug_or_class, n=5),
+        SRC_OPENTARGETS: lambda: get_disease_target_context(design.indication, n=10),
     }
 
 
