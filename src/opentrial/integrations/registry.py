@@ -39,6 +39,13 @@ def integration_statuses() -> list[IntegrationStatus]:
             status=_live_status(),
         ),
         IntegrationStatus(
+            key="opentargets",
+            name="Open Targets",
+            purpose="Disease-target biology associations and translational context.",
+            connected=settings.public_apis_enabled,
+            status=_live_status(),
+        ),
+        IntegrationStatus(
             key="gemini",
             name="Gemini",
             purpose="Optional report narrative synthesis.",
