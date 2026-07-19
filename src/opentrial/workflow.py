@@ -24,7 +24,10 @@ from opentrial.integrations.clinicaltrials import get_trials_ct_gov
 from opentrial.integrations.dailymed import get_dailymed_full_label
 from opentrial.integrations.gemini import generate_report_narrative
 from opentrial.integrations.openfda import get_safety_signals
+from opentrial.integrations.pharmgkb import get_pharmgkb_drug_gene
 from opentrial.integrations.pubmed import get_pubmed_effects
+from opentrial.integrations.semantic_scholar import get_semantic_scholar_papers
+from opentrial.integrations.you_search import get_you_search_context
 from opentrial.report.markdown import render_markdown_report
 from opentrial.schemas import (
     DesignPoint,
@@ -41,6 +44,9 @@ SRC_CTGOV = "ClinicalTrials.gov"
 SRC_PUBMED = "PubMed"
 SRC_OPENFDA = "openFDA (safety)"
 SRC_DAILYMED = "DailyMed (labels)"
+SRC_S2 = "Semantic Scholar"
+SRC_PHARMGKB = "PharmGKB (pharmacogenomics)"
+SRC_YOU = "You.com (web)"
 
 EVIDENCE_SOURCES = [
     SRC_DEMO,
@@ -48,6 +54,9 @@ EVIDENCE_SOURCES = [
     SRC_PUBMED,
     SRC_OPENFDA,
     SRC_DAILYMED,
+    SRC_S2,
+    SRC_PHARMGKB,
+    SRC_YOU,
 ]
 
 
@@ -110,6 +119,14 @@ def _live_fetchers(
         SRC_PUBMED: lambda: get_pubmed_effects(design.indication, design.endpoint, n=10),
         SRC_OPENFDA: lambda: get_safety_signals(drug_or_class, n=10),
         SRC_DAILYMED: lambda: get_dailymed_full_label(drug_or_class, n=5),
+        SRC_S2: lambda: get_semantic_scholar_papers(design.indication, design.endpoint, n=10),
+        SRC_PHARMGKB: lambda: get_pharmgkb_drug_gene(drug_or_class, n=10),
+        SRC_YOU: lambda: get_you_search_context(
+            f"{design.indication} {design.endpoint} {drug_or_class} clinical trial",
+            indication=design.indication,
+            endpoint=design.endpoint,
+            n=5,
+        ),
     }
 
 
