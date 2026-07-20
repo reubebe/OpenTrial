@@ -24,6 +24,7 @@ from opentrial.integrations.clinicaltrials import get_trials_ct_gov
 from opentrial.integrations.dailymed import get_dailymed_full_label
 from opentrial.integrations.gemini import generate_report_narrative
 from opentrial.integrations.openfda import get_safety_signals
+from opentrial.integrations.opentargets import get_disease_target_context
 from opentrial.integrations.pharmgkb import get_pharmgkb_drug_gene
 from opentrial.integrations.pubmed import get_pubmed_effects
 from opentrial.integrations.semantic_scholar import get_semantic_scholar_papers
@@ -47,6 +48,7 @@ SRC_DAILYMED = "DailyMed (labels)"
 SRC_S2 = "Semantic Scholar"
 SRC_PHARMGKB = "PharmGKB (pharmacogenomics)"
 SRC_YOU = "You.com (web)"
+SRC_OPENTARGETS = "Open Targets (biology)"
 
 EVIDENCE_SOURCES = [
     SRC_DEMO,
@@ -57,6 +59,7 @@ EVIDENCE_SOURCES = [
     SRC_S2,
     SRC_PHARMGKB,
     SRC_YOU,
+    SRC_OPENTARGETS,
 ]
 
 
@@ -127,6 +130,7 @@ def _live_fetchers(
             endpoint=design.endpoint,
             n=5,
         ),
+        SRC_OPENTARGETS: lambda: get_disease_target_context(design.indication, n=10),
     }
 
 
