@@ -39,12 +39,22 @@ class Settings(BaseModel):
     debug: bool = _get_bool("OPENTRIAL_DEBUG", False)
     http_retries: int = int(os.getenv("OPENTRIAL_HTTP_RETRIES", "2"))
     gemini_api_key: str | None = os.getenv("GEMINI_API_KEY") or None
+    you_api_key: str | None = os.getenv("YOU_API_KEY") or None
+    semantic_scholar_api_key: str | None = os.getenv("SEMANTIC_SCHOLAR_API_KEY") or None
     ncbi_email: str | None = os.getenv("NCBI_EMAIL") or None
     ncbi_api_key: str | None = os.getenv("NCBI_API_KEY") or None
 
     @property
     def gemini_enabled(self) -> bool:
         return bool(self.gemini_api_key)
+
+    @property
+    def you_enabled(self) -> bool:
+        return bool(self.you_api_key)
+
+    @property
+    def semantic_scholar_enabled(self) -> bool:
+        return bool(self.semantic_scholar_api_key)
 
     @property
     def pubmed_enabled(self) -> bool:

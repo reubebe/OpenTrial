@@ -39,11 +39,32 @@ def integration_statuses() -> list[IntegrationStatus]:
             status=_live_status(),
         ),
         IntegrationStatus(
+            key="semantic_scholar",
+            name="Semantic Scholar",
+            purpose="Academic citation enrichment and related literature metadata.",
+            connected=settings.semantic_scholar_enabled,
+            status="connected" if settings.semantic_scholar_enabled else "missing key",
+        ),
+        IntegrationStatus(
+            key="pharmgkb",
+            name="PharmGKB",
+            purpose="Drug-gene clinical annotation and pharmacogenomics context.",
+            connected=settings.public_apis_enabled,
+            status=_live_status(),
+        ),
+        IntegrationStatus(
             key="opentargets",
             name="Open Targets",
             purpose="Disease-target biology associations and translational context.",
             connected=settings.public_apis_enabled,
             status=_live_status(),
+        ),
+        IntegrationStatus(
+            key="you",
+            name="You.com",
+            purpose="Broad web context for exploratory provenance.",
+            connected=settings.you_enabled,
+            status="connected" if settings.you_enabled else "missing key",
         ),
         IntegrationStatus(
             key="gemini",
