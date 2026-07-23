@@ -133,6 +133,42 @@ def test_get_pubmed_effects_runs_esearch_then_esummary(monkeypatch):
     assert calls[1][1]["id"] == "111,222"
 
 
+def test_get_pubmed_record_by_pmid_fetches_one_audit_target(monkeypatch):
+    monkeypatch.setattr(
+        pubmed,
+        "_summarize_pubmed",
+        lambda pmids, timeout: [
+            {
+                "uid": pmids[0],
+                "title": "Audit publication",
+                "fulljournalname": "Audit Journal",
+                "pubdate": "2023 Jan",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        pubmed,
+        "_fetch_pubmed_abstracts",
+        lambda pmids, timeout: {
+            pmids[0]: (
+                "In 180 patients, treatment reduced HbA1c by -0.40 percentage points "
+                "versus control (95% CI -0.60 to -0.20)."
+            )
+        },
+    )
+
+    records = pubmed.get_pubmed_record_by_pmid(
+        " 12345678 ",
+        condition="Type 2 Diabetes",
+        endpoint="HbA1c change from baseline",
+    )
+
+    assert len(records) == 1
+    assert records[0].title == "Audit publication"
+    assert records[0].n == 180
+    assert records[0].standard_error > 0
+    assert "Audit target PMID 12345678" in records[0].notes
+
 
 def test_extract_continuous_effect_generalizes_to_non_hba1c_endpoint():
     # The extractor should handle any continuous endpoint with a unit + 95% CI,

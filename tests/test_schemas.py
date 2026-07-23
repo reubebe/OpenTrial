@@ -16,6 +16,20 @@ def test_trial_design_input_validates_probability_bounds():
         )
 
 
+def test_binary_trial_design_rejects_impossible_treatment_rate():
+    with pytest.raises(ValidationError, match="baseline_proportion"):
+        TrialDesignInput(
+            indication="X",
+            endpoint="Response rate",
+            target_effect=0.70,
+            alpha=0.025,
+            desired_power=0.80,
+            max_n_per_arm=300,
+            endpoint_type="binary",
+            baseline_proportion=0.50,
+        )
+
+
 def test_evidence_record_validates_standard_error_and_n():
     with pytest.raises(ValidationError):
         EvidenceRecord(

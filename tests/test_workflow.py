@@ -1,6 +1,9 @@
 import json
 
+import pytest
+
 from opentrial import workflow
+from opentrial.compute.bayes import BayesianPriorError
 from opentrial.schemas import TrialDesignInput
 
 
@@ -74,6 +77,22 @@ def test_run_design_surfaces_failed_source_as_warning(monkeypatch):
     assert any("ClinicalTrials.gov" in w and "429" in w for w in result.warnings)
 
 
+def test_build_evidence_prior_falls_back_when_bayesian_unavailable(monkeypatch):
+    from opentrial.data.demo_evidence import t2d_hba1c_evidence
+
+    def raise_bayes(*_a, **_k):
+        raise BayesianPriorError("PyMC not installed")
+
+    monkeypatch.setattr(workflow, "build_prior_bayesian", raise_bayes)
+
+    prior, warning = workflow.build_evidence_prior(
+        t2d_hba1c_evidence(), use_bayesian_prior=True
+    )
+
+    assert prior.records_used == 4  # closed-form prior was used
+    assert warning is not None and "inverse-variance" in warning
+
+
 def test_design_result_exports_reproducible_json_payload():
     result = workflow.run_design(_design(), "metformin", [workflow.SRC_DEMO])
 
@@ -86,6 +105,42 @@ def test_design_result_exports_reproducible_json_payload():
     assert payload["source_outcomes"][0]["status"] == "ok"
     assert payload["evidence"][0]["evidence_kind"] == "effect_estimate"
     assert payload["report_markdown"].startswith("# OpenTrial Design Report")
+
+
+def test_run_design_keeps_audit_target_out_of_prior(monkeypatch):
+    from opentrial.schemas import EvidenceRecord
+
+    audit_record = EvidenceRecord(
+        evidence_kind="trial_precedent",
+        source="ClinicalTrials.gov",
+        title="Audit target trial",
+        effect=9.0,
+        standard_error=0.01,
+        n=80,
+        endpoint="HbA1c",
+        indication="Type 2 Diabetes",
+        year=2024,
+        url="https://example.test/audit",
+        notes="Audit target.",
+    )
+    monkeypatch.setattr(
+        workflow,
+        "get_trial_ct_gov_by_nct",
+        lambda *a, **k: [audit_record],
+    )
+
+    result = workflow.run_design(
+        _design(),
+        "metformin",
+        [workflow.SRC_DEMO],
+        audit_nct_id="NCT12345678",
+    )
+
+    assert len(result.audit_records) == 1
+    assert result.prior.records_used == 4
+    assert "Audit Mode" in result.report
+    assert "below recommendation" in result.report or "above recommendation" in result.report
+    assert "audit_records" in result.to_export_dict()
 
 
 def test_run_design_with_mc_operating_characteristics():

@@ -56,3 +56,51 @@ def test_beta_complements_power_and_type_i_error_matches_alpha():
     )
     assert all(point.type_i_error == design.alpha for point in grid)
 
+
+def test_binary_endpoint_power_and_recommendation():
+    from opentrial.compute.simulation import estimate_power_binary
+    from opentrial.schemas import PriorSummary
+
+    # Two-proportion power should rise with N and exceed the analytic estimate at the
+    # recommended size.
+    weak = PriorSummary(mean=0.0, sd=1.0, pooled_participants=0, records_used=0, method="weak")
+    design = TrialDesignInput(
+        indication="X",
+        endpoint="Response rate",
+        target_effect=0.15,
+        alpha=0.025,
+        desired_power=0.80,
+        max_n_per_arm=400,
+        endpoint_type="binary",
+        baseline_proportion=0.30,
+    )
+    grid = simulate_design_grid(design, weak)
+    rec = recommend_sample_size(grid, 0.80)
+    assert rec is not None
+    assert rec.power >= 0.80
+    assert estimate_power_binary(rec.n_per_arm, 0.30, 0.15, 0.025) >= 0.80
+
+
+def test_binary_power_rejects_impossible_probabilities():
+    from opentrial.compute.simulation import estimate_power_binary
+
+    with pytest.raises(ValueError, match="probabilities"):
+        estimate_power_binary(100, baseline_proportion=0.90, risk_difference=0.30, alpha=0.025)
+
+
+def test_binary_needs_more_patients_at_higher_baseline_variance():
+    from opentrial.schemas import PriorSummary
+
+    weak = PriorSummary(mean=0.0, sd=1.0, pooled_participants=0, records_used=0, method="weak")
+    base = dict(
+        indication="X", endpoint="Response", target_effect=0.15, alpha=0.025,
+        desired_power=0.80, max_n_per_arm=600, endpoint_type="binary",
+    )
+    low = recommend_sample_size(
+        simulate_design_grid(TrialDesignInput(**base, baseline_proportion=0.30), weak), 0.80
+    )
+    high = recommend_sample_size(
+        simulate_design_grid(TrialDesignInput(**base, baseline_proportion=0.50), weak), 0.80
+    )
+    # Variance peaks at p=0.5, so a 0.50 baseline needs at least as many patients as 0.30.
+    assert high.n_per_arm >= low.n_per_arm

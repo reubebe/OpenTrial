@@ -58,6 +58,59 @@ def test_fetch_url_uses_v2_studies_endpoint(monkeypatch):
     assert "pageSize=5" in requested["url"]
 
 
+def test_fetch_study_by_nct_uses_v2_study_endpoint(monkeypatch):
+    requested = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self):
+            return b'{"protocolSection": {}}'
+
+    def fake_urlopen(url, timeout):
+        requested["url"] = url
+        requested["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(clinicaltrials, "urlopen", fake_urlopen)
+
+    payload = clinicaltrials._fetch_study_by_nct("NCT12345678", timeout=3.0)
+
+    assert payload == {"protocolSection": {}}
+    assert requested["timeout"] == 3.0
+    assert requested["url"] == (
+        "https://clinicaltrials.gov/api/v2/studies/NCT12345678?format=json"
+    )
+
+
+def test_get_trial_ct_gov_by_nct_marks_record_as_audit_target(monkeypatch):
+    study = {
+        "protocolSection": {
+            "identificationModule": {
+                "nctId": "NCT12345678",
+                "briefTitle": "Audit trial",
+            },
+            "statusModule": {"startDateStruct": {"date": "2022-03"}},
+            "designModule": {"enrollmentInfo": {"count": 220}},
+        }
+    }
+    monkeypatch.setattr(clinicaltrials, "_fetch_study_by_nct", lambda *a, **k: study)
+
+    records = clinicaltrials.get_trial_ct_gov_by_nct(
+        " nct12345678 ",
+        indication="Type 2 Diabetes",
+    )
+
+    assert len(records) == 1
+    assert records[0].title == "Audit trial"
+    assert records[0].n == 220
+    assert "Audit target NCT12345678" in records[0].notes
+
+
 def test_study_to_record_clamps_malformed_start_date():
     from datetime import date
 
