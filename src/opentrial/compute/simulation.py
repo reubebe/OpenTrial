@@ -24,14 +24,33 @@ def _difference_se(n_per_arm: int, endpoint_sd: float) -> float:
     return math.sqrt((2 * endpoint_sd**2) / n_per_arm)
 
 
-def effect_standard_error(design: TrialDesignInput, n_per_arm: int) -> float:
-    """Effect-scale standard error at ``n_per_arm`` for this design.
+def _binary_difference_se(n_per_arm: int, baseline_proportion: float, risk_difference: float) -> float:
+    """SE of the difference in arm proportions for a two-arm BINARY endpoint."""
 
-    This single quantity is all the power/assurance/posterior formulas need.
+    p_control = baseline_proportion
+    p_treat = p_control + risk_difference
+    if not 0 < p_control < 1 or not 0 < p_treat < 1:
+        raise ValueError(
+            "Binary endpoint probabilities must be between 0 and 1; "
+            "check baseline_proportion and risk_difference."
+        )
+    variance = (
+        p_control * (1 - p_control) / n_per_arm + p_treat * (1 - p_treat) / n_per_arm
+    )
+    return math.sqrt(variance)
+
+
+def effect_standard_error(design: TrialDesignInput, n_per_arm: int) -> float:
+    """Effect-scale standard error at ``n_per_arm`` for this design's endpoint type.
+
+    This single quantity is all the power/assurance/posterior formulas need, so binary
+    support is just a different SE -- the rest of the maths is shared.
     """
 
     if n_per_arm <= 0:
         return 0.0
+    if design.endpoint_type == "binary":
+        return _binary_difference_se(n_per_arm, design.baseline_proportion, design.target_effect)
     return _difference_se(n_per_arm, design.endpoint_sd)
 
 
@@ -39,13 +58,17 @@ def prior_equivalent_n_per_arm(prior: PriorSummary, design: TrialDesignInput) ->
     """How many patients per arm the prior is *worth*, on this design's scale.
 
     This is the prior's information content, which is what ``pooled_participants`` is often
-    mistaken for and is usually far smaller. A two-arm trial with ``n`` per arm estimates the
-    effect with variance ``2*sigma^2/n``; setting that equal to the prior's variance and
-    solving for ``n`` gives the trial that would carry the same weight.
+    mistaken for and is usually far smaller. Solve ``SE(n) = prior.sd`` for ``n``: the trial
+    whose sampling error would match the prior's spread carries the same weight.
     """
 
     if prior.sd <= 0:
         return math.inf
+    if design.endpoint_type == "binary":
+        p_control = design.baseline_proportion
+        p_treat = p_control + design.target_effect
+        numerator = p_control * (1 - p_control) + p_treat * (1 - p_treat)
+        return numerator / prior.sd**2
     return 2 * design.endpoint_sd**2 / prior.sd**2
 
 
@@ -66,21 +89,7 @@ def _assurance_from_se(prior: PriorSummary, standard_error: float, alpha: float)
     return 1 - _normal_cdf((success_threshold - prior.mean) / marginal_sd)
 
 
-def _posterior_from_se(
-    target_effect: float,
-    prior: PriorSummary,
-    standard_error: float,
-    threshold: float = 0.0,
-) -> float:
-    """Pr(effect > ``threshold``) after observing exactly ``target_effect``.
-
-    A conjugate normal update. Note this answers a *hypothetical* ("if the trial read exactly
-    the target, what would we then believe?"), because at design time no data exists. With
-    ``threshold = 0`` and a prior centred well above zero it saturates near 1.0 at every
-    sample size and cannot discriminate; a threshold at the minimum clinically important
-    difference is what makes it informative.
-    """
-
+def _posterior_from_se(target_effect: float, prior: PriorSummary, standard_error: float) -> float:
     likelihood_variance = standard_error**2
     prior_variance = prior.sd**2
     posterior_variance = 1 / ((1 / prior_variance) + (1 / likelihood_variance))
@@ -88,7 +97,7 @@ def _posterior_from_se(
         (prior.mean / prior_variance) + (target_effect / likelihood_variance)
     )
     posterior_sd = math.sqrt(posterior_variance)
-    return 1 - _normal_cdf((threshold - posterior_mean) / posterior_sd)
+    return 1 - _normal_cdf((0 - posterior_mean) / posterior_sd)
 
 
 # --- public continuous helpers (used by tests and the continuous path) --------------
@@ -112,6 +121,17 @@ def estimate_beta(
     return 1 - estimate_power(n_per_arm, effect, alpha, endpoint_sd)
 
 
+def estimate_power_binary(
+    n_per_arm: int, baseline_proportion: float, risk_difference: float, alpha: float
+) -> float:
+    """Approximate one-sided two-proportion z-test power for a binary endpoint."""
+
+    if n_per_arm <= 0:
+        return 0.0
+    se = _binary_difference_se(n_per_arm, baseline_proportion, risk_difference)
+    return _power_from_se(risk_difference, se, alpha)
+
+
 def prior_predictive_assurance(
     n_per_arm: int,
     prior: PriorSummary,
@@ -128,13 +148,10 @@ def prior_predictive_assurance(
 def posterior_success_probability(
     n_per_arm: int, design: TrialDesignInput, prior: PriorSummary
 ) -> float:
-    """Approximate posterior Pr(effect > design.success_threshold)."""
+    """Approximate posterior probability that the treatment effect is positive."""
 
     return _posterior_from_se(
-        design.target_effect,
-        prior,
-        effect_standard_error(design, n_per_arm),
-        design.success_threshold,
+        design.target_effect, prior, effect_standard_error(design, n_per_arm)
     )
 
 

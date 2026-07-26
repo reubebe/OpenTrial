@@ -13,6 +13,17 @@ dependencies = [
 dev = [
   "pytest>=8.0",
 ]
+# Optional PyMC Bayesian meta-analysis engine (compute/bayes.py). Heavy; not needed
+# for the deterministic default path or the offline test suite.
+bayes = [
+  "pymc>=5",
+  "numpy>=1.26",
+]
+# Optional PDF export (report/pdf.py). Pure-Python, no system dependencies; the report
+# still renders as Markdown and JSON without it.
+pdf = [
+  "fpdf2>=2.7",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

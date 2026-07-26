@@ -51,12 +51,50 @@ def get_pubmed_effects(
     ]
 
 
+def get_pubmed_record_by_pmid(
+    pmid: str,
+    condition: str,
+    endpoint: str = "",
+    timeout: float = 10.0,
+) -> list[EvidenceRecord]:
+    """Fetch one PubMed record by PMID for audit mode."""
+
+    cleaned = _clean_pmid(pmid)
+    if not cleaned:
+        raise PubMedError(f"Invalid PMID: {pmid}")
+    summaries = _summarize_pubmed(pmids=[cleaned], timeout=timeout)
+    if not summaries:
+        return []
+    abstracts = _fetch_pubmed_abstracts(pmids=[cleaned], timeout=timeout)
+    record = _summary_to_record(
+        summaries[0],
+        condition=condition,
+        endpoint=endpoint,
+        abstract=abstracts.get(cleaned, ""),
+    )
+    return [
+        record.model_copy(
+            update={
+                "notes": (
+                    f"Audit target PMID {cleaned}; publication compared with "
+                    f"OpenTrial recommendation. {record.notes}"
+                )
+            }
+        )
+    ]
+
+
 def _build_search_term(condition: str, intervention: str = "") -> str:
     parts = [condition.strip()]
     if intervention.strip():
         parts.append(intervention.strip())
     parts.append("(clinical trial[Publication Type] OR meta-analysis[Publication Type] OR randomized[Title/Abstract] OR systematic review[Title/Abstract])")
     return " AND ".join(part for part in parts if part)
+
+
+def _clean_pmid(pmid: str) -> str:
+    value = pmid.strip()
+    return value if re.fullmatch(r"\d{1,12}", value) else ""
 
 
 def _search_pubmed(term: str, n: int, timeout: float) -> list[str]:

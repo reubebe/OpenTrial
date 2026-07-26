@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -35,6 +36,33 @@ def get_trials_ct_gov(
     return [_study_to_record(study, indication) for study in payload.get("studies", [])]
 
 
+def get_trial_ct_gov_by_nct(
+    nct_id: str,
+    indication: str = "",
+    timeout: float = 10.0,
+) -> list[EvidenceRecord]:
+    """Fetch one ClinicalTrials.gov record by NCT ID for audit mode."""
+
+    cleaned = _clean_nct_id(nct_id)
+    if not cleaned:
+        raise ClinicalTrialsGovError(f"Invalid NCT ID: {nct_id}")
+    payload = _fetch_study_by_nct(cleaned, timeout=timeout)
+    if not payload.get("protocolSection"):
+        return []
+    record = _study_to_record(payload, indication or "Audit target")
+    return [
+        record.model_copy(
+            update={
+                "notes": (
+                    f"Audit target {cleaned}; registry enrollment compared with "
+                    "OpenTrial recommendation. "
+                    f"{record.notes}"
+                )
+            }
+        )
+    ]
+
+
 def _fetch_studies(indication: str, n: int, timeout: float) -> dict[str, Any]:
     query = urlencode(
         {
@@ -49,6 +77,20 @@ def _fetch_studies(indication: str, n: int, timeout: float) -> dict[str, Any]:
         return json.loads(read_url(urlopen, url, timeout=timeout).decode("utf-8"))
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise ClinicalTrialsGovError(f"ClinicalTrials.gov request failed: {exc}") from exc
+
+
+def _fetch_study_by_nct(nct_id: str, timeout: float) -> dict[str, Any]:
+    url = f"{CLINICALTRIALS_STUDIES_URL}/{nct_id}?format=json"
+
+    try:
+        return json.loads(read_url(urlopen, url, timeout=timeout).decode("utf-8"))
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise ClinicalTrialsGovError(f"ClinicalTrials.gov request failed: {exc}") from exc
+
+
+def _clean_nct_id(nct_id: str) -> str:
+    value = nct_id.strip().upper()
+    return value if re.fullmatch(r"NCT\d{8}", value) else ""
 
 
 def _study_to_record(study: dict[str, Any], indication: str) -> EvidenceRecord:

@@ -49,16 +49,16 @@ class Settings(BaseModel):
         return bool(self.gemini_api_key)
 
     @property
+    def pubmed_enabled(self) -> bool:
+        return self.use_live_apis
+
+    @property
     def you_enabled(self) -> bool:
         return bool(self.you_api_key)
 
     @property
     def semantic_scholar_enabled(self) -> bool:
         return bool(self.semantic_scholar_api_key)
-
-    @property
-    def pubmed_enabled(self) -> bool:
-        return self.use_live_apis
 
     @property
     def public_apis_enabled(self) -> bool:

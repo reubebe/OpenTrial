@@ -25,8 +25,34 @@ def test_demo_vertical_slice_produces_report():
     assert prior.records_used == len(evidence)
     assert recommendation is not None
     assert "# OpenTrial Design Report" in report
+    assert "Endpoint type: continuous" in report
     assert "Endpoint SD: 1.00" in report
     assert "Evidence Provenance" in report
+
+
+def test_binary_markdown_report_includes_endpoint_assumptions():
+    from opentrial.schemas import PriorSummary
+
+    design = TrialDesignInput(
+        indication="X",
+        endpoint="Response rate",
+        target_effect=0.15,
+        alpha=0.025,
+        desired_power=0.80,
+        max_n_per_arm=300,
+        endpoint_type="binary",
+        baseline_proportion=0.30,
+    )
+    prior = PriorSummary(mean=0.0, sd=1.0, pooled_participants=0, records_used=0, method="weak")
+    grid = simulate_design_grid(design, prior)
+    recommendation = recommend_sample_size(grid, design.desired_power)
+
+    report = render_markdown_report(design, [], prior, grid, recommendation)
+
+    assert "Endpoint type: binary" in report
+    assert "Target effect (risk difference): 0.15" in report
+    assert "Baseline event rate: 0.30" in report
+    assert "Implied treatment event rate: 0.45" in report
 
 
 def test_markdown_report_can_include_ai_narrative():
