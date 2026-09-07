@@ -103,16 +103,37 @@ narrative only and never changes the numbers.
 
 ---
 
-## Future work (beyond the proof of concept)
-Deliberately out of scope for the PoC; the foundation for a fuller version later:
-- **More evidence sources**: WHO ICTRP (request-based access), Open Targets (disease-target
-  biology), PharmGKB (pharmacogenomics), and broader literature search.
-- **Binary / count endpoints**: a two-proportion (risk-difference) and beta-binomial design.
-- **A fuller Bayesian engine**: e.g. a PyMC random-effects prior and group-sequential simulation.
+## Beyond the core path (implemented)
+The proof-of-concept is the single continuous two-arm path above. Several extensions have since
+been built on that foundation and are available in the app (most behind **Advanced options**):
+
+- **Binary endpoints**: a two-proportion (risk-difference) design alongside the continuous one.
+- **Heterogeneity estimator choice**: DerSimonian-Laird (default) or **REML** for the
+  between-study variance, the latter steadier when only a few studies are pooled.
+- **Optional PyMC Bayesian prior**: a full random-effects hierarchical meta-analysis when the
+  optional `bayes` extra is installed; it falls back to the closed-form prior otherwise.
+- **Dropout adjustment**: operating characteristics are computed on the analyzable count
+  `n*(1 - dropout)`, so the recommended N is what to enrol to keep power after attrition.
+- **Duplicate-trial de-duplication**: two reports of one trial (matched by registry id or an
+  exact effect/SE/N fingerprint) are collapsed before pooling, so no trial is counted twice.
+- **Group-sequential designs**: O'Brien-Fleming or Pocock efficacy boundaries, calibrated by
+  simulation so the overall one-sided Type I error equals alpha, with expected-sample-size saving.
+- **Prior sensitivity analysis**: evidence / skeptical / reference / enthusiastic priors side by side.
 - **Audit mode**: benchmark an existing NCT/PMID trial against the recommendation.
-- **Prior sensitivity analysis**: weak / evidence / skeptical / optimistic priors side by side.
-- **PDF export**, richer plots, and, before any real-world use, a statistician's review and
-  formal validation.
+- **Monte Carlo operating characteristics**: an empirical Type I error as a calibration check.
+- **More evidence sources**: Semantic Scholar, Open Targets (biology), PharmGKB
+  (pharmacogenomics), and You.com (web) in addition to the four core sources.
+- **Exports**: Markdown and JSON, plus PDF; an optional Gemini narrative (never changes the numbers).
+- **Independent validation**: `validation/scipy_crosscheck.py` re-derives the core quantities
+  with SciPy and statsmodels and confirms they agree (install the `validation` extra to run it).
+
+## Still future work
+Deliberately out of scope for now:
+- **More evidence sources**: WHO ICTRP (request-based access) and broader literature search.
+- **Count / beta-binomial endpoints.**
+- **Finer design realism**: a t-distribution rather than the z-test at small N, covariate
+  adjustment, and multiplicity across multiple endpoints or subgroups.
+- **Richer plots**, and, before any real-world use, a statistician's review and formal validation.
 
 ## Notes
 This is a learning-oriented proof of concept, not a validated clinical tool. The report's own
