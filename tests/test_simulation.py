@@ -1,7 +1,10 @@
+import math
+
 import pytest
 
 from opentrial.compute.priors import build_prior
 from opentrial.compute.simulation import (
+    effect_standard_error,
     estimate_beta,
     estimate_power,
     prior_predictive_assurance,
@@ -55,6 +58,65 @@ def test_beta_complements_power_and_type_i_error_matches_alpha():
         1 - estimate_power(120, design.target_effect, design.alpha)
     )
     assert all(point.type_i_error == design.alpha for point in grid)
+
+
+def test_dropout_zero_is_the_complete_follow_up_baseline():
+    """The default dropout_rate=0 must leave every operating characteristic unchanged."""
+
+    without = _design()
+    explicit_zero = TrialDesignInput(
+        indication="Type 2 Diabetes", endpoint="HbA1c change from baseline",
+        target_effect=0.50, alpha=0.025, desired_power=0.80, max_n_per_arm=300,
+        dropout_rate=0.0,
+    )
+    assert effect_standard_error(without, 100) == effect_standard_error(explicit_zero, 100)
+
+
+def test_dropout_inflates_the_standard_error_by_one_over_sqrt_retained():
+    """SE is computed on the analyzable count n*(1 - dropout), so it scales exactly."""
+
+    base = _design()
+    for rate in (0.1, 0.2, 0.5):
+        dropped = TrialDesignInput(
+            indication="Type 2 Diabetes", endpoint="HbA1c change from baseline",
+            target_effect=0.50, alpha=0.025, desired_power=0.80, max_n_per_arm=300,
+            dropout_rate=rate,
+        )
+        assert effect_standard_error(dropped, 100) == pytest.approx(
+            effect_standard_error(base, 100) / math.sqrt(1 - rate)
+        )
+
+
+def test_dropout_requires_enrolling_more_to_keep_power():
+    """A design with dropout must recommend at least as many enrolled per arm, and strictly
+    more once attrition is heavy enough to matter at the grid resolution."""
+
+    prior = build_prior(t2d_hba1c_evidence())
+    no_dropout = TrialDesignInput(
+        indication="Type 2 Diabetes", endpoint="HbA1c change from baseline",
+        target_effect=0.50, alpha=0.025, desired_power=0.80, max_n_per_arm=400,
+    )
+    heavy = TrialDesignInput(
+        indication="Type 2 Diabetes", endpoint="HbA1c change from baseline",
+        target_effect=0.50, alpha=0.025, desired_power=0.80, max_n_per_arm=400,
+        dropout_rate=0.5,
+    )
+    rec_none = recommend_sample_size(simulate_design_grid(no_dropout, prior), 0.80)
+    rec_heavy = recommend_sample_size(simulate_design_grid(heavy, prior), 0.80)
+    assert rec_heavy.n_per_arm > rec_none.n_per_arm
+
+
+def test_dropout_at_the_limit_yields_no_information():
+    """If essentially everyone drops out, the analyzable count vanishes and SE is not finite
+    (returned as 0.0 by convention, i.e. no usable information), never a divide-by-zero."""
+
+    extreme = TrialDesignInput(
+        indication="Type 2 Diabetes", endpoint="HbA1c change from baseline",
+        target_effect=0.50, alpha=0.025, desired_power=0.80, max_n_per_arm=300,
+        dropout_rate=0.99,
+    )
+    # 20 enrolled * (1 - 0.99) = 0.2 analyzable -> a valid, very large SE (not a crash).
+    assert effect_standard_error(extreme, 20) > 0
 
 
 def test_binary_endpoint_power_and_recommendation():

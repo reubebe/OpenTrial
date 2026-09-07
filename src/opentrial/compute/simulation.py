@@ -14,17 +14,19 @@ def _normal_quantile(p: float) -> float:
     return NormalDist().inv_cdf(p)
 
 
-def _difference_se(n_per_arm: int, endpoint_sd: float) -> float:
+def _difference_se(n_per_arm: float, endpoint_sd: float) -> float:
     """SE of the difference in arm means for a two-arm CONTINUOUS endpoint.
 
     ``endpoint_sd`` is the population SD of the endpoint, in the same units as the
     target effect. With endpoint_sd = 1.0 the effect is treated as standardized.
+    ``n_per_arm`` is the *analyzable* count per arm (may be fractional after a dropout
+    adjustment).
     """
 
     return math.sqrt((2 * endpoint_sd**2) / n_per_arm)
 
 
-def _binary_difference_se(n_per_arm: int, baseline_proportion: float, risk_difference: float) -> float:
+def _binary_difference_se(n_per_arm: float, baseline_proportion: float, risk_difference: float) -> float:
     """SE of the difference in arm proportions for a two-arm BINARY endpoint."""
 
     p_control = baseline_proportion
@@ -44,14 +46,20 @@ def effect_standard_error(design: TrialDesignInput, n_per_arm: int) -> float:
     """Effect-scale standard error at ``n_per_arm`` for this design's endpoint type.
 
     This single quantity is all the power/assurance/posterior formulas need, so binary
-    support is just a different SE -- the rest of the maths is shared.
+    support is just a different SE -- the rest of the maths is shared. It is also the one
+    place the dropout adjustment is applied: ``n_per_arm`` is the number ENROLLED per arm,
+    and the SE is computed on the analyzable count ``n_per_arm * (1 - dropout_rate)``, so
+    every operating characteristic downstream reflects attrition automatically.
     """
 
     if n_per_arm <= 0:
         return 0.0
+    analyzable = n_per_arm * (1.0 - design.dropout_rate)
+    if analyzable <= 0:
+        return 0.0
     if design.endpoint_type == "binary":
-        return _binary_difference_se(n_per_arm, design.baseline_proportion, design.target_effect)
-    return _difference_se(n_per_arm, design.endpoint_sd)
+        return _binary_difference_se(analyzable, design.baseline_proportion, design.target_effect)
+    return _difference_se(analyzable, design.endpoint_sd)
 
 
 def prior_equivalent_n_per_arm(prior: PriorSummary, design: TrialDesignInput) -> float:

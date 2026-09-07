@@ -36,6 +36,12 @@ class TrialDesignInput(FrozenModel):
     # Control-arm event rate for a BINARY endpoint (ignored when continuous). The
     # treatment-arm rate is baseline_proportion + target_effect.
     baseline_proportion: float = Field(default=0.5, gt=0, lt=1)
+    # Expected proportion of enrolled participants per arm lost before the analysis
+    # (dropout / non-evaluable). The operating characteristics are computed on the
+    # analyzable count n*(1 - dropout_rate), so a design's recommended N is the number to
+    # ENROLL to retain power after attrition. 0.0 (the default) is the complete-follow-up
+    # idealization; a typical trial plans for 0.10-0.20.
+    dropout_rate: float = Field(default=0.0, ge=0, lt=1)
 
     @model_validator(mode="after")
     def binary_treatment_rate_is_possible(self) -> "TrialDesignInput":
@@ -90,6 +96,9 @@ class PriorSummary(FrozenModel):
     # ``opentrial.compute.simulation.prior_equivalent_n_per_arm``.
     pooled_participants: int = Field(ge=0)
     records_used: int = Field(ge=0)
+    # How many effect records were dropped as duplicate reports of a trial already counted
+    # (see ``opentrial.compute.priors.deduplicate_trial_records``). 0 when none overlapped.
+    records_merged: int = Field(default=0, ge=0)
     method: str
 
 

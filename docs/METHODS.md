@@ -79,14 +79,43 @@ agrees to 9 decimal places once truncation is matched. (statsmodels reports the 
 estimate, which here is negative; this implementation truncates at zero per DerSimonian &
 Laird 1986.)
 
+### An alternative heterogeneity estimator: REML
+
+DerSimonian-Laird is the default, but `build_prior(evidence, tau_method="reml")` (exposed in
+the app under Advanced options) estimates `τ²` by **restricted maximum likelihood** instead.
+REML is the `τ² ≥ 0` that maximizes the restricted profile log-likelihood of the
+random-effects model, and it is less biased than the moment estimator at small `k`. Everything
+downstream of `τ²` is identical.
+
+One subtlety is worth stating, because it is where a naive implementation goes wrong. The
+usual REML fixed-point iteration solves the *estimating equation* `dℓ/dτ² = 0`, but that
+equation can have an interior solution even when the restricted likelihood is actually highest
+at the boundary `τ² = 0`: the profile can be bimodal, and an iteration seeded from DL then
+converges to the wrong peak and reports an inflated prior. This implementation therefore
+maximizes the likelihood directly (a bracketed grid plus golden-section search, then a
+comparison against the boundary) rather than iterating the fixed point, so it returns the true
+REML estimate in that case. It is cross-checked against a direct SciPy maximization of the same
+likelihood in `validation/scipy_crosscheck.py`, including that boundary case.
+
+On the demo's homogeneous four records REML agrees with DL (`τ² = 0`, so μ₀ = 0.5009,
+σ₀ = 0.0544 are unchanged); the estimators diverge only when the evidence is genuinely
+borderline, which is exactly where REML is the steadier choice.
+
 ### Limitations worth a reviewer's attention
 
 - **`τ²` is unstable at small `k`.** DerSimonian-Laird is a moment estimator, and with only
   four studies it has wide sampling variability and truncates to zero readily, as it does
-  here. REML or a weakly-informative prior on `τ` would be better behaved for small evidence
-  bases. DL is the right default and a documented standard; it is not the last word.
-- Records are assumed independent. Two publications reporting the same trial would be
-  double-counted.
+  here. REML (now selectable via `tau_method="reml"`) is better behaved for small evidence
+  bases and is the recommended alternative when heterogeneity is borderline; a
+  weakly-informative prior on `τ` would go further still. DL remains the default and a
+  documented standard.
+- **Duplicate reports of one trial are now collapsed before pooling.**
+  `deduplicate_trial_records` groups records by a registry id (an NCT number in the url, title
+  or notes) or, failing that, an exact effect / SE / n / endpoint / indication fingerprint, and
+  keeps only the most informative member of each group (largest `n`, tie-broken by smaller SE).
+  The number removed is reported as `records_merged`. Two papers on one trial no longer weight
+  it twice. What remains is a residual assumption of independence *between distinct trials*,
+  which is standard for a summary-level meta-analysis.
 
 ### `pooled_participants` is provenance, not weight
 
@@ -237,13 +266,18 @@ The math is a deliberate approximation. It assumes:
   `n` the z-test is mildly anti-conservative, because it ignores the uncertainty in estimating
   `σ`.
 - **A known endpoint SD** `σ`, supplied by the user rather than estimated from the trial.
-- **Two arms, equal allocation, one-sided test, a single analysis**, with no interim looks.
-- **No dropout, no covariate adjustment, no multiplicity** across endpoints or subgroups.
+- **Two arms, equal allocation, one-sided test, a single analysis** (interim looks are
+  available separately via the group-sequential option).
+- **Dropout is now modeled** via `dropout_rate`: operating characteristics are computed on the
+  analyzable count `n*(1 - dropout_rate)`, so the recommended `N` is the number to *enrol* to
+  retain power after attrition. **Covariate adjustment and multiplicity** across endpoints or
+  subgroups are still not modeled.
 - **A normal prior**, adequate for pooling effects but not for skewed or bounded parameters.
-- **Independent evidence records**, each contributing one effect and one standard error.
+- **Distinct trials are assumed independent.** Duplicate reports of the *same* trial are now
+  de-duplicated before pooling (see section 1), so the assumption is only between trials.
 
-Each assumption is a place a real design would need more, and the README's *Future work*
-section tracks the ones already on the roadmap.
+Each remaining assumption is a place a real design would need more, and the README's
+*Still future work* section tracks the ones on the roadmap.
 
 ---
 

@@ -26,12 +26,19 @@ def render_markdown_report(
     sensitivity: list[PriorScenario] | None = None,
     group_sequential: GroupSequentialResult | None = None,
 ) -> str:
-    rec_text = (
-        f"{recommendation.n_per_arm} participants per arm "
-        f"({recommendation.n_per_arm * 2} total)"
-        if recommendation
-        else f"Not reached by {design.max_n_per_arm} participants per arm"
-    )
+    if recommendation:
+        rec_text = (
+            f"{recommendation.n_per_arm} participants per arm "
+            f"({recommendation.n_per_arm * 2} total)"
+        )
+        if design.dropout_rate > 0:
+            analyzable = round(recommendation.n_per_arm * (1 - design.dropout_rate))
+            rec_text += (
+                f" to enroll, for about {analyzable} analyzable per arm after "
+                f"{design.dropout_rate:.0%} dropout"
+            )
+    else:
+        rec_text = f"Not reached by {design.max_n_per_arm} participants per arm"
     effect_label = "risk difference" if design.endpoint_type == "binary" else "mean difference"
     endpoint_assumptions = (
         [
@@ -56,12 +63,18 @@ def render_markdown_report(
         *endpoint_assumptions,
         f"- One-sided alpha: {design.alpha:.3f}",
         f"- Desired power: {design.desired_power:.2f}",
+        f"- Planned dropout: {design.dropout_rate:.0%}",
         "",
         "## Evidence-Derived Prior",
         f"- Method: {prior.method}",
         f"- Prior mean: {prior.mean:.3f}",
         f"- Prior SD: {prior.sd:.3f}",
         f"- Records used: {prior.records_used}",
+        *(
+            [f"- Duplicate trial reports merged: {prior.records_merged}"]
+            if prior.records_merged
+            else []
+        ),
         f"- Participants behind the prior: {prior.pooled_participants} (provenance, not weight)",
         f"- Prior is worth about {prior_equivalent_n_per_arm(prior, design):.0f} patients "
         "per arm (its actual information content)",
@@ -213,6 +226,8 @@ def render_markdown_report(
             "",
             "## Notes",
             "- Records with SE=0 are retained for provenance but excluded from prior estimation.",
+            "- Duplicate reports of the same trial (matched by registry id, or an exact effect/SE/N fingerprint) are collapsed to one before pooling, so no trial is counted twice.",
+            "- Dropout: operating characteristics are computed on the analyzable count n*(1 - dropout), so the recommended N is the number to enroll to retain power after attrition.",
             "- Registry, citation, safety, label, target-biology, pharmacogenomic, and web records provide context unless effect uncertainty is extractable.",
             "- PubMed abstracts can enter prior estimation only when a conservative effect-size extractor finds an effect with 95% CI.",
             "- Beta is the type-II error rate at the target effect: beta = 1 - power.",

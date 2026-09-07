@@ -35,10 +35,13 @@ def build_prior_bayesian(
     defers to the closed-form prior rather than running a sampler.
     """
 
-    usable = [record for record in evidence if record.standard_error > 0]
-    if len(usable) < 2:
-        from opentrial.compute.priors import build_prior
+    from opentrial.compute.priors import build_prior, deduplicate_trial_records
 
+    with_effect = [record for record in evidence if record.standard_error > 0]
+    # Collapse duplicate reports of the same trial, matching the closed-form prior so both
+    # engines pool the same independent evidence.
+    usable, records_merged = deduplicate_trial_records(with_effect)
+    if len(usable) < 2:
         return build_prior(evidence)
 
     try:
@@ -83,5 +86,6 @@ def build_prior_bayesian(
         sd=max(float(predictive.std(ddof=1)), 0.05),
         pooled_participants=sum(record.n for record in usable),
         records_used=len(usable),
+        records_merged=records_merged,
         method="PyMC random-effects Bayesian meta-analysis (posterior predictive)",
     )

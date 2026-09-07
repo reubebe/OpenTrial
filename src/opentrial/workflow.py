@@ -19,7 +19,7 @@ from opentrial.compute.bayes import BayesianPriorError, build_prior_bayesian
 from opentrial.compute.decision import summarize_decision
 from opentrial.compute.group_sequential import simulate_group_sequential
 from opentrial.compute.mc import simulate_operating_characteristics
-from opentrial.compute.priors import build_prior
+from opentrial.compute.priors import TauMethod, build_prior
 from opentrial.compute.sensitivity import prior_sensitivity
 from opentrial.config import logger, settings
 from opentrial.compute.simulation import recommend_sample_size, simulate_design_grid
@@ -282,19 +282,26 @@ def gather_audit_targets(
 
 
 def build_evidence_prior(
-    evidence: list[EvidenceRecord], use_bayesian_prior: bool = False
+    evidence: list[EvidenceRecord],
+    use_bayesian_prior: bool = False,
+    tau_method: TauMethod = "dl",
 ) -> tuple[PriorSummary, str | None]:
-    """Build the prior, preferring PyMC when asked but falling back deterministically."""
+    """Build the prior, preferring PyMC when asked but falling back deterministically.
+
+    ``tau_method`` selects the closed-form between-study variance estimator (DerSimonian-Laird
+    or REML); it is used for the analytic prior and for the fallback when the Bayesian prior is
+    requested but unavailable.
+    """
 
     if use_bayesian_prior:
         try:
             return build_prior_bayesian(evidence), None
         except BayesianPriorError as exc:
             return (
-                build_prior(evidence),
+                build_prior(evidence, tau_method=tau_method),
                 f"Bayesian prior unavailable, using inverse-variance prior. {exc}",
             )
-    return build_prior(evidence), None
+    return build_prior(evidence, tau_method=tau_method), None
 
 
 def run_design(
@@ -310,6 +317,7 @@ def run_design(
     use_group_sequential: bool = False,
     gs_n_looks: int = 4,
     gs_boundary: str = "obrien-fleming",
+    tau_method: TauMethod = "dl",
 ) -> DesignResult:
     """Run the full pipeline: gather -> prior -> simulate -> recommend -> render."""
 
@@ -325,7 +333,9 @@ def run_design(
         if outcome.status == "failed":
             warnings.append(f"{outcome.name} unavailable, continuing without it. {outcome.message}")
 
-    prior, prior_warning = build_evidence_prior(evidence, use_bayesian_prior=use_bayesian_prior)
+    prior, prior_warning = build_evidence_prior(
+        evidence, use_bayesian_prior=use_bayesian_prior, tau_method=tau_method
+    )
     if prior_warning:
         warnings.append(prior_warning)
 
