@@ -54,10 +54,19 @@ The capabilities first sketched as future work are built and tested on top of th
 - **Group-sequential designs**: O'Brien-Fleming and Pocock boundaries, calibrated by simulation
   so the overall Type I error holds at the nominal alpha, with the expected-sample-size saving
   reported.
+- **REML heterogeneity estimator**: DerSimonian-Laird (default) or REML for the between-study
+  variance `tau^2`, the latter steadier when only a few studies are pooled.
+- **Dropout adjustment**: operating characteristics computed on the analyzable count
+  `n*(1 - dropout)`, so the recommended N is what to enrol to keep power after attrition.
+- **Duplicate-trial de-duplication**: multiple reports of one trial (matched by registry id or an
+  exact effect/SE/N fingerprint) are collapsed before pooling, so no trial is counted twice.
 - **Wider evidence sources**: Open Targets, PharmGKB, Semantic Scholar, and You.com, on top of
   the core four.
 - **PDF report**: a self-contained PDF export (the `[pdf]` extra) beside Markdown and JSON, plus
   operating-characteristic charts.
+- **Audit mode**: benchmark an existing NCT/PMID trial against the recommendation.
+- **Independent validation**: `validation/scipy_crosscheck.py` re-derives the core quantities
+  with SciPy and statsmodels and confirms they agree (the `validation` extra).
 
 An optional PyMC random-effects prior is available as the `[bayes]` extra; the default math
 stays standard-library only, and the engine degrades gracefully when an extra is absent.
@@ -135,10 +144,13 @@ narrative only and never changes the numbers.
 ---
 
 ## Future work
-The remaining roadmap, now that binary endpoints, prior sensitivity, the decision criterion,
-group-sequential designs, the wider sources, and PDF export are built:
-- **Count endpoints**: a beta-binomial design alongside the continuous and binary ones.
-- **Audit mode**: benchmark an existing NCT/PMID trial against the recommendation.
+The remaining roadmap, now that binary endpoints, REML, dropout, de-duplication, prior
+sensitivity, the decision criterion, group-sequential designs, the wider sources, and PDF
+export are built:
+- **More evidence sources**: WHO ICTRP (request-based access) and broader literature search.
+- **Count / beta-binomial endpoints** alongside the continuous and binary ones.
+- **Finer design realism**: a t-distribution rather than the z-test at small N, covariate
+  adjustment, and multiplicity across multiple endpoints or subgroups.
 - **Richer diagnostics**: expanded plots and reporting.
 - Before any real-world use, a statistician's review and formal validation.
 

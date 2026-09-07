@@ -1,0 +1,12 @@
+# OpenTrial app theme -- "futuristic" dark variant.
+# Deep space background, electric cyan/violet accents, high-contrast text.
+[theme]
+base = "dark"
+primaryColor = "#22D3EE"
+backgroundColor = "#080B14"
+secondaryBackgroundColor = "#0F1626"
+textColor = "#E6ECFB"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"

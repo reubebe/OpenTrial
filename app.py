@@ -26,10 +26,120 @@ from opentrial.workflow import (
 )
 
 
-st.set_page_config(page_title="OpenTrial", page_icon="OT", layout="wide")
+st.set_page_config(
+    page_title="OpenTrial",
+    page_icon="OT",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-st.title("OpenTrial")
-st.caption("Bayesian trial design engine")
+# Futuristic dark polish: deep-space ground, neon accents, glassmorphism cards.
+# Everything here is presentational; no app behaviour depends on it.
+st.markdown(
+    """
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@400;500;600&display=swap');
+
+      /* Ambient gradient wash over the deep-space background. */
+      .stApp {
+        background:
+          radial-gradient(1100px 600px at 12% -8%, rgba(34,211,238,.10), transparent 60%),
+          radial-gradient(900px 500px at 105% 0%, rgba(139,92,246,.12), transparent 55%),
+          #080B14;
+      }
+      .block-container { padding-top: 2rem; max-width: 1200px; }
+
+      html, body, [class*="css"] { font-family: 'Inter', system-ui, sans-serif; }
+
+      /* Neon header slab with a glass sheen and glow. */
+      .ot-header {
+        position: relative;
+        background: linear-gradient(120deg, rgba(15,22,38,.85) 0%, rgba(23,32,54,.85) 100%);
+        border: 1px solid rgba(34,211,238,.35);
+        border-radius: 16px;
+        padding: 1.3rem 1.6rem;
+        margin-bottom: 1.5rem;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 0 0 1px rgba(34,211,238,.05), 0 8px 40px rgba(34,211,238,.12);
+        overflow: hidden;
+      }
+      .ot-header::before {
+        content: ""; position: absolute; inset: 0;
+        background: linear-gradient(90deg, transparent, rgba(34,211,238,.06), transparent);
+      }
+      .ot-header h1 {
+        margin: 0; font-family: 'Orbitron', sans-serif; font-weight: 800;
+        font-size: 2rem; letter-spacing: 2px;
+        background: linear-gradient(90deg, #22D3EE 0%, #8B5CF6 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 24px rgba(34,211,238,.25);
+      }
+      .ot-header p {
+        margin: .35rem 0 0 0; font-size: .95rem; color: #9FB0D0;
+        letter-spacing: .3px;
+      }
+
+      /* Glass cards: the bordered input container and any generic bordered block. */
+      div[data-testid="stVerticalBlockBorderWrapper"] {
+        background: rgba(15,22,38,.55) !important;
+        border: 1px solid rgba(120,150,220,.18) !important;
+        border-radius: 14px !important;
+        backdrop-filter: blur(6px);
+      }
+
+      /* Metric tiles glow faintly and lift on the dark ground. */
+      div[data-testid="stMetric"] {
+        background: linear-gradient(160deg, rgba(20,28,48,.9), rgba(12,18,32,.9));
+        border: 1px solid rgba(34,211,238,.22);
+        border-radius: 12px;
+        padding: .85rem 1rem;
+        box-shadow: 0 4px 24px rgba(0,0,0,.35), inset 0 0 20px rgba(34,211,238,.04);
+      }
+      div[data-testid="stMetricValue"] {
+        color: #E6ECFB; text-shadow: 0 0 16px rgba(34,211,238,.35);
+      }
+      div[data-testid="stMetricLabel"] p {
+        font-weight: 600; color: #7FE9F7; letter-spacing: .4px;
+        text-transform: uppercase; font-size: .72rem;
+      }
+
+      /* Section headers: monospace-ish, cyan, with an underline accent. */
+      h2, h3 {
+        color: #CFE8FF; letter-spacing: .6px;
+        border-bottom: 1px solid rgba(34,211,238,.18);
+        padding-bottom: .3rem;
+      }
+
+      /* Primary button: neon gradient with glow, brighter on hover. */
+      .stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, #22D3EE 0%, #6D5AF0 100%);
+        border: none; color: #05121A; font-weight: 700; letter-spacing: .4px;
+        box-shadow: 0 0 24px rgba(34,211,238,.35);
+        transition: box-shadow .2s ease, transform .05s ease;
+      }
+      .stButton > button[kind="primary"]:hover {
+        box-shadow: 0 0 34px rgba(34,211,238,.6); transform: translateY(-1px);
+      }
+
+      /* Sidebar: darker glass panel with a cyan hairline edge. */
+      section[data-testid="stSidebar"] {
+        background: rgba(9,13,22,.92);
+        border-right: 1px solid rgba(34,211,238,.15);
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+    <div class="ot-header">
+      <h1>OPENTRIAL</h1>
+      <p>Bayesian trial design engine &middot; evidence-based priors &middot; power, assurance &amp; decision criteria</p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 with st.sidebar:
     st.header("Integrations")
@@ -66,6 +176,16 @@ with st.sidebar:
             step=0.01,
             disabled=endpoint_type != "binary",
             help="Binary endpoints only: the control-arm event rate the risk difference is measured from.",
+        )
+        tau_method_label = st.radio(
+            "Heterogeneity (tau squared) estimator",
+            options=["DerSimonian-Laird", "REML"],
+            help=(
+                "How the between-study variance tau^2 is estimated for the random-effects "
+                "prior. DerSimonian-Laird is a one-shot moment estimator (fast, but noisy and "
+                "quick to truncate to zero when there are only a few studies). REML solves the "
+                "likelihood by iteration and is steadier at small numbers of studies."
+            ),
         )
         use_bayesian_prior = st.checkbox(
             "PyMC Bayesian meta-analysis prior (slower)",
@@ -116,9 +236,11 @@ with st.sidebar:
         audit_pmid = st.text_input("PMID", value="", placeholder="12345678")
 
 is_binary = endpoint_type == "binary"
+tau_method = "reml" if tau_method_label == "REML" else "dl"
 
 st.subheader("Trial Inputs")
-left, right = st.columns(2)
+inputs_card = st.container(border=True)
+left, right = inputs_card.columns(2, gap="large")
 
 with left:
     indication = st.text_input("Indication", value="Type 2 Diabetes")
@@ -154,6 +276,20 @@ with right:
         "One-sided alpha", min_value=0.001, max_value=0.20, value=0.025, step=0.005, format="%.3f"
     )
     desired_power = st.number_input("Desired power", min_value=0.50, max_value=0.99, value=0.80)
+    dropout_rate = st.number_input(
+        "Planned dropout rate",
+        min_value=0.0,
+        max_value=0.90,
+        value=0.0,
+        step=0.05,
+        format="%.2f",
+        help=(
+            "Expected proportion of enrolled participants per arm lost before analysis. "
+            "Operating characteristics are computed on the analyzable count n*(1 - dropout), "
+            "so the recommended N is what to ENROLL to keep power after attrition. 0 is the "
+            "complete-follow-up idealization; trials typically plan 0.10-0.20."
+        ),
+    )
     max_n = st.number_input("Max N per arm", min_value=40, max_value=1000, value=300, step=20)
     core_sources = st.multiselect(
         "Evidence sources",
@@ -186,6 +322,7 @@ design = TrialDesignInput(
     endpoint_type=endpoint_type,
     endpoint_sd=float(endpoint_sd),
     baseline_proportion=float(baseline_proportion),
+    dropout_rate=float(dropout_rate),
 )
 
 if st.button("Generate design report", type="primary"):
@@ -203,6 +340,7 @@ if st.button("Generate design report", type="primary"):
             use_group_sequential=use_group_sequential,
             gs_n_looks=gs_n_looks,
             gs_boundary=gs_boundary,
+            tau_method=tau_method,
         )
 
     for message in result.warnings:
@@ -217,10 +355,21 @@ if st.button("Generate design report", type="primary"):
     metric_cols[0].metric("Evidence records", len(result.evidence))
     metric_cols[1].metric("Prior mean", f"{result.prior.mean:.2f}")
     metric_cols[2].metric("Prior SD", f"{result.prior.sd:.2f}")
+    rec_help = None
+    if result.recommendation and design.dropout_rate > 0:
+        analyzable = round(result.recommendation.n_per_arm * (1 - design.dropout_rate))
+        rec_help = f"to enroll; ~{analyzable} analyzable after {design.dropout_rate:.0%} dropout"
     metric_cols[3].metric(
         "Recommended N/arm",
         str(result.recommendation.n_per_arm) if result.recommendation else "Not reached",
+        help=rec_help,
     )
+
+    if result.prior.records_merged:
+        st.caption(
+            f"De-duplication: {result.prior.records_merged} duplicate trial "
+            f"report(s) merged before pooling, so no trial is counted twice."
+        )
 
     if result.outcomes:
         st.subheader("Sources")

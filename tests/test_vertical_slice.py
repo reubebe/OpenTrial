@@ -55,6 +55,55 @@ def test_binary_markdown_report_includes_endpoint_assumptions():
     assert "Implied treatment event rate: 0.45" in report
 
 
+def test_markdown_report_surfaces_dropout_as_enrolled_vs_analyzable():
+    design = TrialDesignInput(
+        indication="Type 2 Diabetes",
+        endpoint="HbA1c change from baseline",
+        target_effect=0.50,
+        alpha=0.025,
+        desired_power=0.80,
+        max_n_per_arm=400,
+        dropout_rate=0.20,
+    )
+    evidence = t2d_hba1c_evidence()
+    prior = build_prior(evidence)
+    grid = simulate_design_grid(design, prior)
+    recommendation = recommend_sample_size(grid, design.desired_power)
+    report = render_markdown_report(design, evidence, prior, grid, recommendation)
+
+    assert "Planned dropout: 20%" in report
+    assert "to enroll" in report
+    assert "analyzable per arm after 20% dropout" in report
+
+
+def test_markdown_report_surfaces_merged_duplicate_reports():
+    from opentrial.schemas import EvidenceRecord
+
+    def _rec(effect, se, n, url, title):
+        return EvidenceRecord(
+            evidence_kind="effect_estimate", source="s", title=title, effect=effect,
+            standard_error=se, n=n, endpoint="HbA1c", indication="Type 2 Diabetes",
+            year=2024, url=url,
+        )
+
+    evidence = [
+        _rec(0.5, 0.1, 200, "https://clinicaltrials.gov/study/NCT01234567", "primary"),
+        _rec(0.5, 0.1, 120, "https://x.org", "duplicate report of NCT01234567"),
+        _rec(0.4, 0.12, 150, "https://y.org/other", "a different trial"),
+    ]
+    design = TrialDesignInput(
+        indication="Type 2 Diabetes", endpoint="HbA1c change from baseline",
+        target_effect=0.50, alpha=0.025, desired_power=0.80, max_n_per_arm=300,
+    )
+    prior = build_prior(evidence)
+    grid = simulate_design_grid(design, prior)
+    recommendation = recommend_sample_size(grid, design.desired_power)
+    report = render_markdown_report(design, evidence, prior, grid, recommendation)
+
+    assert prior.records_merged == 1
+    assert "Duplicate trial reports merged: 1" in report
+
+
 def test_markdown_report_can_include_ai_narrative():
     design = TrialDesignInput(
         indication="Type 2 Diabetes",
