@@ -3,7 +3,7 @@
 [![CABS: ds4cabs](https://img.shields.io/badge/CABS-ds4cabs-1f4b99?logo=github)](https://github.com/ds4cabs)
 [![GitHub Pages: live](https://img.shields.io/badge/GitHub_Pages-live-brightgreen?logo=github)](https://ds4cabs.github.io/OpenTrial/)
 ![CABS: 2026](https://img.shields.io/badge/CABS-2026-6f42c1)
-![status: proof of concept](https://img.shields.io/badge/status-proof_of_concept-f1c40f)
+![status: active](https://img.shields.io/badge/status-active-2ea44f)
 ![type: Computation Engine](https://img.shields.io/badge/type-Computation_Engine-1f6feb)
 ![domain: Bayesian Trial Design](https://img.shields.io/badge/domain-Bayesian_Trial_Design-0aa)
 
@@ -11,20 +11,22 @@
 **Project Type:** Computation Engine
 
 ## What it is
-OpenTrial is a **proof-of-concept** Bayesian trial-design report engine. You describe a
-two-arm trial; it returns a reproducible report whose **prior is traceable to cited evidence**
-and whose **operating characteristics** (power, and a simulated Type I error) are the part a
-statistician can actually check. It is scoped as a clean PoC, one design done well, not a
-production tool.
+OpenTrial is a Bayesian trial-design report engine. You describe a two-arm trial; it returns a
+reproducible report whose **prior is traceable to cited evidence** and whose **operating
+characteristics** (power, and a simulated Type I error) are the part a statistician can actually
+check. It began as a single-path proof of concept and now covers continuous and binary
+endpoints, prior sensitivity, a Bayesian decision criterion, and group-sequential designs. It
+remains a learning-oriented engine, not a validated clinical tool.
 
-![OpenTrial's proof-of-concept view: a lean trial-design form with four core evidence sources](docs/images/app_screenshot.png)
+![OpenTrial's view: a trial-design form with the core and extended evidence sources](docs/images/app_screenshot.png)
 
-*The proof of concept: a continuous two-arm design, four core evidence sources, and the
-operating-characteristics path: input to cited prior to power/Type-I to downloadable report.*
+*The core demonstrated path: a continuous two-arm design and the operating-characteristics
+route, input to cited prior to power/Type-I to downloadable report. The sections below cover
+the capabilities built on top of it.*
 
-## The proof-of-concept, in one path
-The whole project is built around a single, end-to-end path, a two-arm trial on a continuous
-endpoint, demonstrated with seeded **Type 2 Diabetes / HbA1c** evidence:
+## The core path, end to end
+The project is anchored on a single, end-to-end path, a two-arm trial on a continuous endpoint,
+demonstrated with seeded **Type 2 Diabetes / HbA1c** evidence:
 
 1. **Trial inputs**: indication, endpoint, target effect, endpoint SD, alpha, desired power, max N.
 2. **Evidence-derived prior with provenance**: every contributing record is listed with its
@@ -40,6 +42,35 @@ endpoint, demonstrated with seeded **Type 2 Diabetes / HbA1c** evidence:
 > provenance* below. This maps to the FDA expectations for adaptive designs (pre-specification,
 > Type I error control, simulation-based justification).
 
+## Beyond the core path (now implemented)
+The capabilities first sketched as future work are built and tested on top of the core path:
+
+- **Binary endpoints**: a two-proportion (risk-difference) design alongside the continuous one,
+  anchored on a baseline event rate.
+- **Prior sensitivity analysis**: evidence, skeptical, reference, and enthusiastic priors run
+  side by side, reporting how assurance and the decision move with the prior.
+- **Bayesian decision criterion**: posterior Pr(effect > 0) against a decision threshold, plus a
+  predictive probability of success.
+- **Group-sequential designs**: O'Brien-Fleming and Pocock boundaries, calibrated by simulation
+  so the overall Type I error holds at the nominal alpha, with the expected-sample-size saving
+  reported.
+- **REML heterogeneity estimator**: DerSimonian-Laird (default) or REML for the between-study
+  variance `tau^2`, the latter steadier when only a few studies are pooled.
+- **Dropout adjustment**: operating characteristics computed on the analyzable count
+  `n*(1 - dropout)`, so the recommended N is what to enrol to keep power after attrition.
+- **Duplicate-trial de-duplication**: multiple reports of one trial (matched by registry id or an
+  exact effect/SE/N fingerprint) are collapsed before pooling, so no trial is counted twice.
+- **Wider evidence sources**: Open Targets, PharmGKB, Semantic Scholar, and You.com, on top of
+  the core four.
+- **PDF report**: a self-contained PDF export (the `[pdf]` extra) beside Markdown and JSON, plus
+  operating-characteristic charts.
+- **Audit mode**: benchmark an existing NCT/PMID trial against the recommendation.
+- **Independent validation**: `validation/scipy_crosscheck.py` re-derives the core quantities
+  with SciPy and statsmodels and confirms they agree (the `validation` extra).
+
+An optional PyMC random-effects prior is available as the `[bayes]` extra; the default math
+stays standard-library only, and the engine degrades gracefully when an extra is absent.
+
 ## Quickstart
 ```bash
 python3 -m venv .venv
@@ -49,7 +80,7 @@ python3 -m pytest                       # offline suite, no network/keys needed
 streamlit run app.py                    # opens in your browser
 ```
 With no configuration it runs **fully offline** on the seeded T2D / HbA1c demo; the complete
-PoC path works on day one. To pull live evidence, copy `.env.example` to `.env`, set
+core path works on day one. To pull live evidence, copy `.env.example` to `.env`, set
 `OPENTRIAL_USE_LIVE_APIS=true`, and add any optional keys (see **Configuration**).
 
 ## How to use it
@@ -76,13 +107,20 @@ below is written out, with its assumptions and known limitations, in **[docs/MET
   rows, safety counts, labels) are shown for provenance but **excluded from the prior**, the
   central honesty rule.
 
-## Core data sources (PoC scope)
-The PoC tells a complete story with a small set of sources, working well:
+## Evidence sources
+The core four carry the demonstrated path:
 
 - **ClinicalTrials.gov** (v2 studies API): US trial precedent.
 - **PubMed** (NCBI E-utilities): published effect estimates, with a cautious effect + 95% CI extractor.
 - **openFDA FAERS**: post-market safety-signal context.
 - **DailyMed**: structured label provenance (dosing / adverse events).
+
+Four further sources add translational and literature context:
+
+- **Open Targets**: disease-target biology associations.
+- **PharmGKB**: drug-gene clinical annotation and pharmacogenomics context.
+- **Semantic Scholar**: academic citation enrichment and related literature.
+- **You.com**: broad web context for exploratory provenance.
 
 Live sources are off by default; the seeded demo needs none of them.
 
@@ -91,6 +129,8 @@ Live sources are off by default; the seeded demo needs none of them.
 | --- | --- | --- |
 | `OPENTRIAL_USE_LIVE_APIS` | the live public sources (CT.gov, PubMed, openFDA, DailyMed, …) | Off by default |
 | `NCBI_EMAIL`, `NCBI_API_KEY` | PubMed etiquette / higher rate limits | Optional |
+| `SEMANTIC_SCHOLAR_API_KEY` | Semantic Scholar higher rate limits | Optional |
+| `YOU_API_KEY` | You.com web-context source | Optional |
 | `GEMINI_API_KEY` | optional AI narrative synthesis | Optional |
 | `OPENTRIAL_DEBUG` | verbose logging + exception detail in warnings | Off by default |
 | `OPENTRIAL_HTTP_RETRIES` | retries for transient API errors (429/5xx/timeout) | Default 2 |
@@ -103,39 +143,18 @@ narrative only and never changes the numbers.
 
 ---
 
-## Beyond the core path (implemented)
-The proof-of-concept is the single continuous two-arm path above. Several extensions have since
-been built on that foundation and are available in the app (most behind **Advanced options**):
-
-- **Binary endpoints**: a two-proportion (risk-difference) design alongside the continuous one.
-- **Heterogeneity estimator choice**: DerSimonian-Laird (default) or **REML** for the
-  between-study variance, the latter steadier when only a few studies are pooled.
-- **Optional PyMC Bayesian prior**: a full random-effects hierarchical meta-analysis when the
-  optional `bayes` extra is installed; it falls back to the closed-form prior otherwise.
-- **Dropout adjustment**: operating characteristics are computed on the analyzable count
-  `n*(1 - dropout)`, so the recommended N is what to enrol to keep power after attrition.
-- **Duplicate-trial de-duplication**: two reports of one trial (matched by registry id or an
-  exact effect/SE/N fingerprint) are collapsed before pooling, so no trial is counted twice.
-- **Group-sequential designs**: O'Brien-Fleming or Pocock efficacy boundaries, calibrated by
-  simulation so the overall one-sided Type I error equals alpha, with expected-sample-size saving.
-- **Prior sensitivity analysis**: evidence / skeptical / reference / enthusiastic priors side by side.
-- **Audit mode**: benchmark an existing NCT/PMID trial against the recommendation.
-- **Monte Carlo operating characteristics**: an empirical Type I error as a calibration check.
-- **More evidence sources**: Semantic Scholar, Open Targets (biology), PharmGKB
-  (pharmacogenomics), and You.com (web) in addition to the four core sources.
-- **Exports**: Markdown and JSON, plus PDF; an optional Gemini narrative (never changes the numbers).
-- **Independent validation**: `validation/scipy_crosscheck.py` re-derives the core quantities
-  with SciPy and statsmodels and confirms they agree (install the `validation` extra to run it).
-
-## Still future work
-Deliberately out of scope for now:
+## Future work
+The remaining roadmap, now that binary endpoints, REML, dropout, de-duplication, prior
+sensitivity, the decision criterion, group-sequential designs, the wider sources, and PDF
+export are built:
 - **More evidence sources**: WHO ICTRP (request-based access) and broader literature search.
-- **Count / beta-binomial endpoints.**
+- **Count / beta-binomial endpoints** alongside the continuous and binary ones.
 - **Finer design realism**: a t-distribution rather than the z-test at small N, covariate
   adjustment, and multiplicity across multiple endpoints or subgroups.
-- **Richer plots**, and, before any real-world use, a statistician's review and formal validation.
+- **Richer diagnostics**: expanded plots and reporting.
+- Before any real-world use, a statistician's review and formal validation.
 
 ## Notes
-This is a learning-oriented proof of concept, not a validated clinical tool. The report's own
+This is a learning-oriented engine, not a validated clinical tool. The report's own
 Notes section states the model's assumptions; the math is a transparent approximation by
 design, with simulation available to check it.
